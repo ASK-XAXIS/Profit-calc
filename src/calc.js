@@ -9,6 +9,6 @@ export function calcProfit(sellPrice, buyPrice, fee, ship, packCost){
 }
 
 //損益分岐点の計算
-export function calcBreakEven(buyPrice, ship, feeRate){
-    return Math.ceil((buyPrice + ship) / (1 - feeRate))
+export function calcBreakEven(buyPrice, ship, packCost, feeRate){
+    return Math.ceil((buyPrice + ship + packCost) / (1 - feeRate))
 }

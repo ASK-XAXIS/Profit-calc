@@ -22,9 +22,9 @@ const currentOptions = selectedService ? selectedService.options : []
   const selectedOption = currentOptions.find((o) => o.value === shipping)
   const ship = selectedOption ? selectedOption.fee : 0
 
-  const fee = calcFee(sellPrice, feeRate[platform])
-  const profit = calcProfit(sellPrice, buyPrice, fee, ship, packCost)
-  const breakEven = calcBreakEven(buyPrice, ship, feeRate[platform])
+  const fee = calcFee(Number(sellPrice) || 0, feeRate[platform])
+  const profit = calcProfit(Number(sellPrice) || 0, Number(buyPrice) || 0, fee, Number(ship) || 0, Number(packCost) || 0)
+  const breakEven = calcBreakEven(Number(buyPrice) || 0, Number(ship) || 0, Number(packCost) || 0, feeRate[platform])
 
   //プラットフォーム変更時に配送方法をリセット
   const handlePlatformChange = (e) => {
@@ -107,13 +107,20 @@ const currentOptions = selectedService ? selectedService.options : []
           <label className="block text-sm font-medium text-gray-600 mb-1">
             梱包材費（円）
           </label>
-          <input
-            type="number"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={packCost}
-            onChange={(e) => setPackCost(e.target.value === '' ? '': Number(e.target.value))}
-            placeholder="例：50"
-          />
+           <input
+              type = "text"
+              inputMode = "numeric"
+              pattern = "[0-9]*"
+              className = "w-full border border-gray-300 rounded-1g px-3 py-2 text-gray-800 focus:outline-none focus:ring-blue-400"
+              value={packCost}
+              onChange={(e)=> {
+                const val = e.target.value
+                if(val ===''||/^[0-9]+$/.test(val)){
+                  setPackCost(val === '' ? '' : Number(val))
+                }
+              }}
+              placeholder="例 : 50"
+            />
         </div>
 
         {/* 売値 */}
@@ -122,10 +129,17 @@ const currentOptions = selectedService ? selectedService.options : []
             売値（円）
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
             value={sellPrice}
-            onChange={(e) => setSellPrice(e.target.value === '' ? '': Number(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '' || /^[0-9]+$/.test(val)) {
+                setSellPrice(val === '' ? '' : Number(val))
+              }
+    }}
             placeholder="例：3000"
           />
         </div>
@@ -136,10 +150,17 @@ const currentOptions = selectedService ? selectedService.options : []
             仕入れ値（円）
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
             value={buyPrice}
-            onChange={(e) => setBuyPrice(e.target.value === '' ? '': Number(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '' || /^[0-9]+$/.test(val)) {
+                setBuyPrice(val === '' ? '' : Number(val))
+              }
+            }}
             placeholder="例：1000"
           />
         </div>

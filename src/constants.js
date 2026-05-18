@@ -13,7 +13,7 @@
       label: 'らくらくメルカリ便',
       options: [
         { value: 'nekoposu',          label: 'ネコポス',          fee: 210 },
-        { value: 'takkyubinCompact',  label: '宅急便コンパクト',   fee: 520 },
+        { value: 'takkyubinCompact',  label: '宅急便コンパクト',   fee: 450 },
         { value: 'takkyubin60',       label: '宅急便60サイズ',     fee: 750 },
         { value: 'takkyubin80',       label: '宅急便80サイズ',     fee: 850 },
         { value: 'takkyubin100',      label: '宅急便100サイズ',    fee: 1050 },
@@ -30,7 +30,7 @@
       options: [
         { value: 'yupacket',          label: 'ゆうパケット',           fee: 230 },
         { value: 'yupacketPost',      label: 'ゆうパケットポスト',      fee: 215 },
-        { value: 'yupacketPostMini',  label: 'ゆうパケットmini',       fee: 160 },
+        { value: 'yupacketPostMini',  label: 'ゆうパケットポストmini',       fee: 160 },
         { value: 'yupacketPostPlus',  label: 'ゆうパケットプラス',      fee: 455 },
         { value: 'yupack60',          label: 'ゆうパック60サイズ',      fee: 750 },
         { value: 'yupack80',          label: 'ゆうパック80サイズ',      fee: 870 },
@@ -47,7 +47,7 @@
         service: 'yamato',
       label: 'ヤマト運輸',
       options:[{ value: 'nekoposu', label: 'ネコポス', fee: 210},
-        { value: 'takkyubinCompact', label: '宅急便コンパクト(梱包材代70円込み)', fee: 560 },
+        { value: 'takkyubinCompact', label: '宅急便コンパクト', fee: 490 },
         { value: 'takkyubin60',  label: '宅急便60サイズ',     fee: 750 },
         { value: 'takkyubin80',  label: '宅急便80サイズ',     fee: 850 },
         { value: 'takkyubin100', label: '宅急便100サイズ',    fee: 1050 },
@@ -64,7 +64,7 @@
         options:[
         { value: 'yupacket',     label: 'ゆうパケット',       fee: 215 },
         { value: 'yupacketPost', label: 'ゆうパケットポスト',  fee: 275 },
-        { value: 'yupacketPostMini', label: 'ゆうパケットmini', fee: 180 },
+        { value: 'yupacketPostMini', label: 'ゆうパケットポストmini', fee: 160 },
         { value: 'yupacketPostPlus', label: 'ゆうパケットプラス', fee: 475 },
         { value: 'yupack60',     label: 'ゆうパック60サイズ', fee: 750 },
         { value: 'yupack80',     label: 'ゆうパック80サイズ', fee: 850 },
@@ -84,7 +84,7 @@
         label: 'かんたんラクマパック(ヤマト運輸)',
         options:[
           { value: 'nekoposu', label: 'ネコポス', fee: 200},
-          { value: 'takkyubinCompact', label: '宅急便コンパクト(箱代70円込み)', fee: 500 },
+          { value: 'takkyubinCompact', label: '宅急便コンパクト', fee: 430 },
           { value: 'takkyubin60',  label: '宅急便60サイズ',     fee: 650 },
           { value: 'takkyubin80',  label: '宅急便80サイズ',     fee: 750 },
           { value: 'takkyubin100', label: '宅急便100サイズ',    fee: 1050 },
@@ -101,7 +101,7 @@
         options:[
           { value: 'yupacket',     label: 'ゆうパケット',       fee: 200 },
           { value: 'yupacketPost', label: 'ゆうパケットポスト',  fee: 175 },
-          { value: 'yupacketPostMini', label: 'ゆうパケットmini', fee: 170 },
+          { value: 'yupacketPostMini', label: 'ゆうパケットポストmini', fee: 170 },
           { value: 'yupacketPostPlus', label: 'ゆうパケットプラス', fee: 450 },
           { value: 'yupack60',     label: 'ゆうパック60サイズ', fee: 700 },
           { value: 'yupack80',     label: 'ゆうパック80サイズ', fee: 800 },
