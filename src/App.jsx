@@ -248,8 +248,10 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
 // ─────────────────────────────────────────
 function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
 
-  const [globalSell, setGlobalSell] = useState('')
-  const [globalBuy,  setGlobalBuy]  = useState('')
+  const [globalSell, setGlobalSell]       = useState('')
+  const [globalBuy,  setGlobalBuy]        = useState('')
+  const [showPackInput, setShowPackInput] = useState(false)
+  const [globalPack,    setGlobalPack]    = useState('')
 
   const initOverride = useCallback(() => ({
     mercari:  { sellPrice: '', service: '', shipping: '', packCost: '0', shipAndPackCost: '' },
@@ -278,7 +280,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
   }
 
   // クリア系
-  function clearAll()     { setGlobalSell(''); setGlobalBuy(''); setOverrides(initOverride()) }
+  function clearAll()     { setGlobalSell(''); setGlobalBuy(''); setGlobalPack(''); setShowPackInput(false); setOverrides(initOverride()) }
   function clearSellAll() {
     setGlobalSell('')
     setOverrides((prev) => {
@@ -295,6 +297,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
     })
   }
   function clearPackAll() {
+    setGlobalPack('')
     setOverrides((prev) => {
       const next = { ...prev }
       for (const pf of PLATFORMS) next[pf] = { ...prev[pf], packCost: '0', shipAndPackCost: '' }
@@ -370,6 +373,57 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
             />
           </div>
         </div>
+        {/* 梱包材費一括入力トグル */}
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <button
+            onClick={() => setShowPackInput((v) => !v)}
+            className="w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>📦</span> 梱包材費を一括入力
+            </span>
+            <span className={`text-gray-400 transition-transform ${showPackInput ? 'rotate-180' : ''}`}>▼</span>
+          </button>
+
+          {showPackInput && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={globalPack}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '' || /^[0-9]+$/.test(v)) setGlobalPack(v === '' ? '' : Number(v))
+                }}
+                placeholder="例：50"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-base font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+                autoFocus
+              />
+              <span className="text-sm text-gray-400 shrink-0">円</span>
+              <button
+                onClick={() => {
+                  if (globalPack === '') return
+                  setOverrides((prev) => {
+                    const next = { ...prev }
+                    for (const pf of PLATFORMS) {
+                      const svcObj = shippingOptions[pf].find((s) => s.service === prev[pf].service)
+                      const isNonAnon = svcObj ? svcObj.anonymous === false : false
+                      next[pf] = isNonAnon
+                        ? { ...prev[pf], shipAndPackCost: String(globalPack) }
+                        : { ...prev[pf], packCost: String(globalPack) }
+                    }
+                    return next
+                  })
+                  setShowPackInput(false)
+                }}
+                className="shrink-0 rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition"
+              >
+                一括適用
+              </button>
+            </div>
+          )}
+        </div>
+
         <p className="text-[9px] text-gray-300 mt-2 text-center">
           各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます
         </p>
