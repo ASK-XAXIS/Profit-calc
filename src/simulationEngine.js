@@ -20,7 +20,7 @@ function filterOptionsByThickness(options, thicknessCm) {
  * プラットフォーム×発送方法の全組み合わせで損益を計算して返す
  *
  * @param {object} params
- * @param {number|string} params.sellPriceOverrides  - { mercari: 1500, yahoo: 1500, rakuma: 1500 } 上書き売値
+ * @param {number|string} params.sellPriceOverrides  - { mercari, yahoo, rakuma, yahuoku } 上書き売値
  * @param {number|string} params.buyPrice
  * @param {number|string} params.packCost
  * @param {number|string} params.thickness
@@ -34,6 +34,9 @@ export function buildSimulation({ sellPriceOverrides, buyPrice, packCost, thickn
     const sellPrice = Number(sellPriceOverrides[platformKey]) || 0
 
     for (const serviceObj of services) {
+      // 匿名配送以外（anonymous: false）はシミュレーション対象外
+      if (serviceObj.anonymous === false) continue
+
       const filteredOptions = filterOptionsByThickness(serviceObj.options, thickness)
 
       for (const option of filteredOptions) {

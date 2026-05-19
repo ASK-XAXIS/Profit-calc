@@ -7,6 +7,7 @@ const PLATFORM_LABEL = {
   mercari: 'メルカリ',
   yahoo:   'Yahoo!フリマ',
   rakuma:  'ラクマ',
+  yahuoku: 'ヤフオク',
 }
 
 const PLATFORM_STYLE = {
@@ -36,6 +37,15 @@ const PLATFORM_STYLE = {
     badge:       'bg-pink-100 text-pink-700',
     radio:       'accent-pink-500',
     editBtn:     'text-pink-600 underline decoration-dotted hover:opacity-70',
+  },
+  yahuoku: {
+    header:      'bg-orange-500',
+    headerText:  'text-white',
+    border:      'border-orange-200',
+    rowBest:     'bg-orange-50',
+    badge:       'bg-orange-100 text-orange-700',
+    radio:       'accent-orange-500',
+    editBtn:     'text-orange-600 underline decoration-dotted hover:opacity-70',
   },
 }
 
@@ -217,6 +227,7 @@ export default function SimulationModal({ product, onClose, onSaveRoute }) {
     mercari: initSellPrice,
     yahoo:   initSellPrice,
     rakuma:  initSellPrice,
+    yahuoku: initSellPrice,
   })
 
   // 選択中の行（ラジオ）
@@ -246,7 +257,7 @@ export default function SimulationModal({ product, onClose, onSaveRoute }) {
     return g
   }, [allRows])
 
-  const platforms = ['mercari', 'yahoo', 'rakuma']
+  const platforms = ['mercari', 'yahoo', 'rakuma', 'yahuoku']
 
   function handleSaveRoute() {
     if (!selectedRow) return
@@ -342,7 +353,7 @@ export default function SimulationModal({ product, onClose, onSaveRoute }) {
         {/* ── 3カラム横展開テーブル ── */}
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-x-auto overflow-y-hidden">
-            <div className="grid grid-cols-3 gap-3 px-4 py-4 h-full" style={{ minWidth: '560px' }}>
+            <div className="grid grid-cols-4 gap-2 px-4 py-4 h-full" style={{ minWidth: '700px' }}>
               {platforms.map((pf) => (
                 <PlatformColumn
                   key={pf}
