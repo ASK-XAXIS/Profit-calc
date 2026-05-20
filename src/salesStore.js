@@ -46,12 +46,15 @@ export function saveSale(sale) {
   }
 
   localStorage.setItem(SALES_KEY, JSON.stringify(sales))
+  // SummaryPage に変更を通知
+  window.dispatchEvent(new CustomEvent('sales-updated'))
   return { success: true }
 }
 
 export function deleteSale(id) {
   const sales = getAllSales().filter((s) => s.id !== id)
   localStorage.setItem(SALES_KEY, JSON.stringify(sales))
+  window.dispatchEvent(new CustomEvent('sales-updated'))
 }
 
 // 売上から純利益を計算
