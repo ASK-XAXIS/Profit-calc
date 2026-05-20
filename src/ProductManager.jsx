@@ -7,6 +7,7 @@ import {
 } from './productStore'
 import { shippingOptions } from './constants'
 import SimulationModal from './SimulationModal'
+import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig.jsx'
 
 const MAX_PRODUCTS  = 100
 const MAX_IMAGES    = 10
@@ -263,7 +264,7 @@ function FieldLabel({ label, required }) {
   )
 }
 
-function ProductFormModal({ product: initial, onSave, onClose, calcState }) {
+function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRates, onFeeRatesChange }) {
   const [p, setP] = useState(initial)
   const [errors, setErrors] = useState({})
 
@@ -401,9 +402,26 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState }) {
               <option value="">選択してください</option>
               <option value="mercari">メルカリ（10%）</option>
               <option value="yahoo">Yahoo!フリマ（5%）</option>
-              <option value="rakuma">ラクマ（10%）</option>
+              <option value="rakuma">ラクマ（{feeLabel(feeRates?.rakuma ?? 0.10)}）</option>
             </select>
           </div>
+
+          {/* ラクマ選択時のみ手数料率変更セレクト */}
+          {p.platform === 'rakuma' && (
+            <div>
+              <FieldLabel label="ラクマ手数料率" />
+              <select
+                value={feeRates?.rakuma ?? 0.10}
+                onChange={(e) => onFeeRatesChange?.({ ...feeRates, rakuma: Number(e.target.value) })}
+                className={ic}
+              >
+                {RAKUMA_FEE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">全領域に即時反映されます</p>
+            </div>
+          )}
 
           {p.platform && (
             <div>
@@ -635,7 +653,7 @@ function CardGrid3({ product, onEdit, onDelete, onLoadToCalc, onSimulate }) {
 // ─────────────────────────────────────────
 // メインコンポーネント
 // ─────────────────────────────────────────
-export default function ProductManager({ calcState, onLoadToCalc, addBtnId, viewMode, onViewModeChange }) {
+export default function ProductManager({ calcState, onLoadToCalc, addBtnId, viewMode, onViewModeChange, feeRates, onFeeRatesChange }) {
   const [products, setProducts]               = useState([])
   const [showModal, setShowModal]             = useState(false)
   const [editingProduct, setEditingProduct]   = useState(null)
@@ -737,11 +755,15 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
           onSave={handleSave}
           onClose={() => setShowModal(false)}
           calcState={calcState}
+          feeRates={feeRates}
+          onFeeRatesChange={onFeeRatesChange}
         />
       )}
       {simulatingProduct && (
         <SimulationModal
           product={simulatingProduct}
+          feeRates={feeRates}
+          onFeeRatesChange={onFeeRatesChange}
           onClose={() => setSimulatingProduct(null)}
           onSaveRoute={handleSaveRoute}
         />
