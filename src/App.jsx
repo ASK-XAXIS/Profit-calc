@@ -1,20 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
+import { RAKUMA_FEE_OPTIONS, RAKUMA_FEE_KEY, loadRakumaFee, saveRakumaFee, feeLabel } from './feeConfig'
 import ProductManager, { ViewModeToggle } from './ProductManager'
-
-// ─────────────────────────────────────────
-// ラクマ手数料の選択肢
-// ─────────────────────────────────────────
-const RAKUMA_FEE_OPTIONS = [
-  { label: '10%（通常）', value: 0.10  },
-  { label: '9%',          value: 0.09  },
-  { label: '8%',          value: 0.08  },
-  { label: '7%',          value: 0.07  },
-  { label: '6%',          value: 0.06  },
-  { label: '4.5%',        value: 0.045 },
-]
-const RAKUMA_FEE_KEY = 'rakuma_fee_rate'
 
 // ─────────────────────────────────────────
 // タブ定義
@@ -55,50 +43,66 @@ const PLATFORM_META = {
 const PLATFORMS = ['mercari', 'yahoo', 'rakuma', 'yahuoku']
 
 // ─────────────────────────────────────────
-// ラクマ手数料設定ポップオーバー
+// 手数料バッジ（ラクマのみタップで変更可）
+// 計算機・シミュレーション共通で使用
 // ─────────────────────────────────────────
-function RakumaFeeSelector({ value, onChange }) {
+export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
   const [open, setOpen] = useState(false)
-  const isChanged = value !== 0.10
+  const isRakuma  = platform === 'rakuma'
+  const isChanged = isRakuma && feeRate !== 0.10
+
+  // ラクマ以外は固定表示のみ
+  if (!isRakuma) {
+    return (
+      <span className={[
+        'text-[10px] font-semibold rounded px-1.5 py-0.5',
+        dark ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-500',
+      ].join(' ')}>
+        {feeLabel(feeRate)}
+      </span>
+    )
+  }
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         className={[
-          'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition',
+          'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold transition',
           isChanged
-            ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-            : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200',
+            ? 'bg-yellow-300 text-yellow-900 hover:bg-yellow-200'
+            : dark
+              ? 'bg-white/20 text-white hover:bg-white/30'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200',
         ].join(' ')}
+        title="タップして手数料率を変更"
       >
-        <span className="w-2 h-2 rounded-full bg-blue-900 shrink-0" />
-        <span>ラクマ {(value * 100).toFixed(1).replace('.0', '')}%</span>
-        <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 shrink-0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M4 6l4 4 4-4" />
+        {feeLabel(feeRate)}
+        <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2 shrink-0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+          <path d="M2 3.5l3 3 3-3" />
         </svg>
       </button>
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[160px]">
-            <div className="px-3 py-2 border-b border-gray-100">
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-[70] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden min-w-[155px]">
+            <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">ラクマ手数料率</p>
             </div>
             {RAKUMA_FEE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
-                onClick={() => { onChange(opt.value); setOpen(false) }}
+                onClick={() => { onFeeChange(opt.value); setOpen(false) }}
                 className={[
                   'w-full flex items-center justify-between px-3 py-2 text-sm transition',
-                  value === opt.value
+                  feeRate === opt.value
                     ? 'bg-blue-50 text-blue-700 font-bold'
                     : 'text-gray-700 hover:bg-gray-50',
                 ].join(' ')}
               >
                 <span>{opt.label}</span>
-                {value === opt.value && (
+                {feeRate === opt.value && (
                   <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-blue-500" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <path d="M3 8l3.5 3.5L13 4" />
                   </svg>
@@ -113,15 +117,13 @@ function RakumaFeeSelector({ value, onChange }) {
 }
 
 // ─────────────────────────────────────────
-// 数値入力フィールド（共通）
+// 数値入力フィールド
 // ─────────────────────────────────────────
 function NumInput({ value, onChange, placeholder, suffix }) {
   return (
     <div className="flex items-center gap-0.5">
       <input
-        type="text"
-        inputMode="numeric"
-        value={value}
+        type="text" inputMode="numeric" value={value}
         onChange={(e) => {
           const v = e.target.value
           if (v === '' || /^[0-9]+$/.test(v)) onChange(v === '' ? '' : Number(v))
@@ -135,23 +137,21 @@ function NumInput({ value, onChange, placeholder, suffix }) {
 }
 
 // ─────────────────────────────────────────
-// プラットフォーム結果カラム
+// 計算機：プラットフォーム結果カラム
 // ─────────────────────────────────────────
-function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates }) {
+function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, onFeeRatesChange }) {
   const meta     = PLATFORM_META[platform]
   const services = shippingOptions[platform]
   const ov       = overrides[platform]
-  const rate     = feeRates[platform]   // ← feeRates から取得
+  const rate     = feeRates[platform]
 
-  const selSvc        = ov.service
-  const svcObj        = services.find((s) => s.service === selSvc) || null
+  const selSvc         = ov.service
+  const svcObj         = services.find((s) => s.service === selSvc) || null
   const isNonAnonymous = svcObj ? svcObj.anonymous === false : false
   const shipObj        = svcObj?.options.find((o) => o.value === ov.shipping)
 
   const shipFee  = isNonAnonymous ? 0 : (shipObj ? shipObj.fee : 0)
-  const packCost = isNonAnonymous
-    ? (Number(ov.shipAndPackCost) || 0)
-    : (Number(ov.packCost) || 0)
+  const packCost = isNonAnonymous ? (Number(ov.shipAndPackCost) || 0) : (Number(ov.packCost) || 0)
 
   const sp     = Number(ov.sellPrice) || 0
   const bp     = Number(buyPrice)     || 0
@@ -164,62 +164,44 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates })
     onOverride(platform, { ...ov, service: val, shipping: '', packCost: '0', shipAndPackCost: '' })
   }
 
-  const shipOptions = svcObj?.options || []
-
   return (
     <div className={`flex flex-col rounded-xl overflow-hidden border ${meta.border} bg-white`}>
 
       {/* ヘッダー */}
       <div className={`${meta.color} px-2 py-2 flex items-center justify-between`}>
         <span className="text-white font-bold text-[11px] leading-tight">{meta.label}</span>
-        {/* 手数料率バッジ（ラクマが変更中は強調表示） */}
-        <span className={[
-          'text-[9px] font-semibold rounded px-1.5 py-0.5',
-          platform === 'rakuma' && rate !== 0.10
-            ? 'bg-yellow-300 text-yellow-900'
-            : 'text-white/70 bg-white/20',
-        ].join(' ')}>
-          {(rate * 100).toFixed(1).replace('.0', '')}%
-        </span>
+        {/* 手数料バッジ（ラクマのみタップで変更可） */}
+        <FeeBadge
+          platform={platform}
+          feeRate={rate}
+          onFeeChange={(val) => onFeeRatesChange({ ...feeRates, [platform]: val })}
+          dark={true}
+        />
       </div>
 
       <div className="px-2 py-2 flex flex-col gap-2 flex-1">
 
-        {/* 販売価格 */}
         <div>
           <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">販売価格</p>
           <NumInput value={ov.sellPrice} onChange={(v) => set('sellPrice', v)} placeholder="---" suffix="円" />
         </div>
 
-        {/* 発送サービス */}
         <div>
           <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">発送</p>
-          <select
-            value={selSvc}
-            onChange={(e) => handleServiceChange(e.target.value)}
-            className="w-full text-[9px] text-gray-700 bg-gray-50 border border-gray-200 rounded px-1 py-1 focus:outline-none mb-1"
-          >
+          <select value={selSvc} onChange={(e) => handleServiceChange(e.target.value)}
+            className="w-full text-[9px] text-gray-700 bg-gray-50 border border-gray-200 rounded px-1 py-1 focus:outline-none mb-1">
             <option value="">選択</option>
-            {services.map((s) => (
-              <option key={s.service} value={s.service}>{s.label}</option>
-            ))}
+            {services.map((s) => <option key={s.service} value={s.service}>{s.label}</option>)}
           </select>
-
           {selSvc && !isNonAnonymous && (
-            <select
-              value={ov.shipping}
-              onChange={(e) => set('shipping', e.target.value)}
-              className="w-full text-[9px] text-gray-700 bg-gray-50 border border-gray-200 rounded px-1 py-1 focus:outline-none"
-            >
+            <select value={ov.shipping} onChange={(e) => set('shipping', e.target.value)}
+              className="w-full text-[9px] text-gray-700 bg-gray-50 border border-gray-200 rounded px-1 py-1 focus:outline-none">
               <option value="">方法選択</option>
-              {shipOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+              {(svcObj?.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           )}
         </div>
 
-        {/* 梱包材費 or 送料＋梱包材費（匿名配送以外） */}
         <div>
           {isNonAnonymous ? (
             <>
@@ -237,30 +219,20 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates })
 
         <div className="border-t border-gray-100" />
 
-        {/* 内訳 */}
         <div className="space-y-0.5 text-[9px] text-gray-400">
-          <div className="flex justify-between">
-            <span>手数料</span><span>{fee.toLocaleString()}円</span>
-          </div>
+          <div className="flex justify-between"><span>手数料</span><span>{fee.toLocaleString()}円</span></div>
           {isNonAnonymous ? (
-            <div className="flex justify-between">
-              <span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span>
-            </div>
+            <div className="flex justify-between"><span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span></div>
           ) : (
             <>
-              <div className="flex justify-between">
-                <span>送料</span><span>{shipFee.toLocaleString()}円</span>
-              </div>
-              <div className="flex justify-between">
-                <span>梱包材</span><span>{packCost.toLocaleString()}円</span>
-              </div>
+              <div className="flex justify-between"><span>送料</span><span>{shipFee.toLocaleString()}円</span></div>
+              <div className="flex justify-between"><span>梱包材</span><span>{packCost.toLocaleString()}円</span></div>
             </>
           )}
         </div>
 
         <div className="border-t border-gray-100" />
 
-        {/* 利益 / 最大仕入れ */}
         {bp === 0 ? (
           <div className="text-center py-1">
             <p className="text-[8px] text-gray-400 mb-0.5">最高仕入れ額</p>
@@ -270,13 +242,9 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates })
             {maxBuy > 0 && <p className="text-[8px] text-gray-400 mt-0.5">円まで可</p>}
           </div>
         ) : (
-          <div className={`rounded-lg px-1 py-2 text-center ${
-            profit > 0 ? meta.light : profit < 0 ? 'bg-red-50' : 'bg-gray-50'
-          }`}>
+          <div className={`rounded-lg px-1 py-2 text-center ${profit > 0 ? meta.light : profit < 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
             <p className="text-[8px] text-gray-400 mb-0.5">販売利益</p>
-            <p className={`text-xl font-black leading-none ${
-              profit > 0 ? meta.text : profit < 0 ? 'text-red-500' : 'text-gray-400'
-            }`}>
+            <p className={`text-xl font-black leading-none ${profit > 0 ? meta.text : profit < 0 ? 'text-red-500' : 'text-gray-400'}`}>
               {profit > 0 ? '+' : ''}{profit.toLocaleString()}
             </p>
             <p className="text-[8px] text-gray-400 mt-0.5">円</p>
@@ -290,7 +258,7 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates })
 // ─────────────────────────────────────────
 // 計算機ページ
 // ─────────────────────────────────────────
-function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRates }) {
+function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRates, onFeeRatesChange }) {
   const [globalSell, setGlobalSell]       = useState('')
   const [globalBuy,  setGlobalBuy]        = useState('')
   const [showPackInput, setShowPackInput] = useState(false)
@@ -310,9 +278,8 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     setOverrides((prev) => {
       const next = { ...prev }
       for (const pf of PLATFORMS) {
-        if (prev[pf].sellPrice === '' || prev[pf].sellPrice === globalSell) {
+        if (prev[pf].sellPrice === '' || prev[pf].sellPrice === globalSell)
           next[pf] = { ...prev[pf], sellPrice: val }
-        }
       }
       return next
     })
@@ -325,26 +292,14 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
   function clearAll()     { setGlobalSell(''); setGlobalBuy(''); setGlobalPack(''); setShowPackInput(false); setOverrides(initOverride()) }
   function clearSellAll() {
     setGlobalSell('')
-    setOverrides((prev) => {
-      const next = { ...prev }
-      for (const pf of PLATFORMS) next[pf] = { ...prev[pf], sellPrice: '' }
-      return next
-    })
+    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],sellPrice:''}; return n })
   }
   function clearShipAll() {
-    setOverrides((prev) => {
-      const next = { ...prev }
-      for (const pf of PLATFORMS) next[pf] = { ...prev[pf], service: '', shipping: '', shipAndPackCost: '' }
-      return next
-    })
+    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],service:'',shipping:'',shipAndPackCost:''}; return n })
   }
   function clearPackAll() {
     setGlobalPack('')
-    setOverrides((prev) => {
-      const next = { ...prev }
-      for (const pf of PLATFORMS) next[pf] = { ...prev[pf], packCost: '0', shipAndPackCost: '' }
-      return next
-    })
+    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],packCost:'0',shipAndPackCost:''}; return n })
   }
 
   const [prevLoaded, setPrevLoaded] = useState(null)
@@ -354,10 +309,10 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     setGlobalSell(sp !== '' ? String(sp) : '')
     setGlobalBuy(loadedProduct.buyPrice !== '' ? String(loadedProduct.buyPrice) : '')
     setOverrides({
-      mercari:  { sellPrice: sp, service: loadedProduct.platform === 'mercari'  ? (loadedProduct.service || '') : '', shipping: loadedProduct.platform === 'mercari'  ? (loadedProduct.shipping || '') : '', packCost: loadedProduct.packCost !== '' ? String(loadedProduct.packCost) : '0', shipAndPackCost: '' },
-      yahoo:    { sellPrice: sp, service: loadedProduct.platform === 'yahoo'    ? (loadedProduct.service || '') : '', shipping: loadedProduct.platform === 'yahoo'    ? (loadedProduct.shipping || '') : '', packCost: loadedProduct.packCost !== '' ? String(loadedProduct.packCost) : '0', shipAndPackCost: '' },
-      rakuma:   { sellPrice: sp, service: loadedProduct.platform === 'rakuma'   ? (loadedProduct.service || '') : '', shipping: loadedProduct.platform === 'rakuma'   ? (loadedProduct.shipping || '') : '', packCost: loadedProduct.packCost !== '' ? String(loadedProduct.packCost) : '0', shipAndPackCost: '' },
-      yahuoku:  { sellPrice: sp, service: loadedProduct.platform === 'yahuoku'  ? (loadedProduct.service || '') : '', shipping: loadedProduct.platform === 'yahuoku'  ? (loadedProduct.shipping || '') : '', packCost: loadedProduct.packCost !== '' ? String(loadedProduct.packCost) : '0', shipAndPackCost: '' },
+      mercari:  { sellPrice: sp, service: loadedProduct.platform==='mercari'  ?(loadedProduct.service||''):'', shipping: loadedProduct.platform==='mercari'  ?(loadedProduct.shipping||''):'', packCost: loadedProduct.packCost!==''?String(loadedProduct.packCost):'0', shipAndPackCost:'' },
+      yahoo:    { sellPrice: sp, service: loadedProduct.platform==='yahoo'    ?(loadedProduct.service||''):'', shipping: loadedProduct.platform==='yahoo'    ?(loadedProduct.shipping||''):'', packCost: loadedProduct.packCost!==''?String(loadedProduct.packCost):'0', shipAndPackCost:'' },
+      rakuma:   { sellPrice: sp, service: loadedProduct.platform==='rakuma'   ?(loadedProduct.service||''):'', shipping: loadedProduct.platform==='rakuma'   ?(loadedProduct.shipping||''):'', packCost: loadedProduct.packCost!==''?String(loadedProduct.packCost):'0', shipAndPackCost:'' },
+      yahuoku:  { sellPrice: sp, service: loadedProduct.platform==='yahuoku'  ?(loadedProduct.service||''):'', shipping: loadedProduct.platform==='yahuoku'  ?(loadedProduct.shipping||''):'', packCost: loadedProduct.packCost!==''?String(loadedProduct.packCost):'0', shipAndPackCost:'' },
     })
   }
 
@@ -381,57 +336,39 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
         </div>
       )}
 
-      {/* 共通入力 */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">共通入力</p>
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-500 mb-1">販売価格（円）</label>
-            <input
-              type="text" inputMode="numeric" value={globalSell}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v === '' || /^[0-9]+$/.test(v)) handleGlobalSell(v === '' ? '' : Number(v))
-              }}
+            <input type="text" inputMode="numeric" value={globalSell}
+              onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) handleGlobalSell(v===''?'':Number(v)) }}
               placeholder="例：3,000"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
             />
           </div>
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-500 mb-1">
-              仕入れ額（円）
-              <span className="ml-1 text-[9px] text-gray-300 font-normal">未入力→最高仕入れ額</span>
+              仕入れ額（円）<span className="ml-1 text-[9px] text-gray-300 font-normal">未入力→最高仕入れ額</span>
             </label>
-            <input
-              type="text" inputMode="numeric" value={globalBuy}
-              onChange={(e) => {
-                const v = e.target.value
-                if (v === '' || /^[0-9]+$/.test(v)) setGlobalBuy(v === '' ? '' : Number(v))
-              }}
+            <input type="text" inputMode="numeric" value={globalBuy}
+              onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) setGlobalBuy(v===''?'':Number(v)) }}
               placeholder="未入力"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
             />
           </div>
         </div>
 
-        {/* 梱包材費一括入力 */}
         <div className="mt-3 border-t border-gray-100 pt-3">
-          <button
-            onClick={() => setShowPackInput((v) => !v)}
-            className="w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition"
-          >
+          <button onClick={() => setShowPackInput((v) => !v)}
+            className="w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">
             <span className="flex items-center gap-1.5"><span>📦</span> 梱包材費を一括入力</span>
             <span className={`text-gray-400 transition-transform ${showPackInput ? 'rotate-180' : ''}`}>▼</span>
           </button>
-
           {showPackInput && (
             <div className="mt-2 flex items-center gap-2">
-              <input
-                type="text" inputMode="numeric" value={globalPack}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (v === '' || /^[0-9]+$/.test(v)) setGlobalPack(v === '' ? '' : Number(v))
-                }}
+              <input type="text" inputMode="numeric" value={globalPack}
+                onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) setGlobalPack(v===''?'':Number(v)) }}
                 placeholder="例：50"
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-base font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
                 autoFocus
@@ -460,13 +397,10 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
             </div>
           )}
         </div>
-
-        <p className="text-[9px] text-gray-300 mt-2 text-center">
-          各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます
-        </p>
+        <p className="text-[9px] text-gray-300 mt-2 text-center">各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます</p>
       </div>
 
-      {/* 4列プラットフォーム */}
+      {/* 4列 */}
       <div className="grid grid-cols-4 gap-1.5">
         {PLATFORMS.map((pf) => (
           <PlatformColumn
@@ -476,19 +410,16 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
             overrides={overrides}
             onOverride={handleOverride}
             feeRates={feeRates}
+            onFeeRatesChange={onFeeRatesChange}
           />
         ))}
       </div>
 
-      {/* 登録ボタン */}
-      <button
-        onClick={handleRegisterFromCalc}
-        className="w-full rounded-xl border border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition"
-      >
+      <button onClick={handleRegisterFromCalc}
+        className="w-full rounded-xl border border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition">
         この情報内容で商品管理に新規登録する →
       </button>
 
-      {/* クリアボタン群 */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">クリア</p>
         <div className="grid grid-cols-2 gap-2">
@@ -513,16 +444,10 @@ function BottomNav({ activeTab, onTabChange }) {
         {TABS.map((tab) => {
           const active = activeTab === tab.id
           return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={[
-                'flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors relative',
-                active ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600',
-              ].join(' ')}
-            >
+            <button key={tab.id} onClick={() => onTabChange(tab.id)}
+              className={['flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors relative', active?'text-blue-500':'text-gray-400 hover:text-gray-600'].join(' ')}>
               {tab.icon(active)}
-              <span className={`text-[10px] font-medium ${active ? 'text-blue-500' : 'text-gray-400'}`}>{tab.label}</span>
+              <span className={`text-[10px] font-medium ${active?'text-blue-500':'text-gray-400'}`}>{tab.label}</span>
               {active && <span className="absolute bottom-0 w-8 h-0.5 bg-blue-500 rounded-full" />}
             </button>
           )
@@ -536,25 +461,25 @@ function BottomNav({ activeTab, onTabChange }) {
 // App ルート
 // ─────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab] = useState('products')
-  const [viewMode, setViewMode]   = useState(() => localStorage.getItem('product_view_mode') || 'list')
+  const [activeTab, setActiveTab]         = useState('products')
+  const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
   // ラクマ手数料率（localStorage で永続保存）
-  const [rakumaFee, setRakumaFee] = useState(() => {
-    const saved = localStorage.getItem(RAKUMA_FEE_KEY)
-    return saved ? Number(saved) : 0.10
-  })
-  function handleRakumaFeeChange(val) {
+  const [rakumaFee, setRakumaFee] = useState(loadRakumaFee)
+
+  function handleFeeRatesChange(newRates) {
+    // ラクマのみ変更可能
+    const val = newRates.rakuma ?? rakumaFee
     setRakumaFee(val)
-    localStorage.setItem(RAKUMA_FEE_KEY, String(val))
+    saveRakumaFee(val)
   }
 
   // feeRates オブジェクト（全コンポーネントに渡す）
   const feeRates = useMemo(() => ({
     mercari:  defaultFeeRate.mercari,
     yahoo:    defaultFeeRate.yahoo,
-    rakuma:   rakumaFee,               // ← ラクマのみ可変
+    rakuma:   rakumaFee,
     yahuoku:  defaultFeeRate.yahuoku,
   }), [rakumaFee])
 
@@ -578,25 +503,18 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
           <h1 className="text-base font-bold text-gray-800 shrink-0 mr-auto">
             {activeTab === 'products' && '商品管理'}
             {activeTab === 'calc'     && '利益計算機'}
           </h1>
-
-          {/* 商品管理タブ：表示モード切り替え */}
           {activeTab === 'products' && (
             <ViewModeToggle viewMode={viewMode} onChange={handleViewModeChange} />
           )}
-
-          {/* 全タブ共通：ラクマ手数料設定 */}
-          <RakumaFeeSelector value={rakumaFee} onChange={handleRakumaFeeChange} />
         </div>
       </header>
 
-      {/* メイン */}
       <main className="pb-24 pt-4 px-3">
         <div className={activeTab === 'products' ? 'block' : 'hidden'}>
           <ProductManager
@@ -606,6 +524,7 @@ export default function App() {
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             feeRates={feeRates}
+            onFeeRatesChange={handleFeeRatesChange}
           />
         </div>
         <div className={activeTab === 'calc' ? 'block' : 'hidden'}>
@@ -614,6 +533,7 @@ export default function App() {
             setLoadedProduct={setLoadedProduct}
             onSwitchToProducts={handleSwitchToProducts}
             feeRates={feeRates}
+            onFeeRatesChange={handleFeeRatesChange}
           />
         </div>
       </main>
