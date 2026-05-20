@@ -1,8 +1,20 @@
-import { useState, useCallback } from 'react'
-import { feeRate, shippingOptions } from './constants'
+import { useState, useCallback, useMemo } from 'react'
+import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
-import { saveProduct } from './productStore'
 import ProductManager, { ViewModeToggle } from './ProductManager'
+
+// ─────────────────────────────────────────
+// ラクマ手数料の選択肢
+// ─────────────────────────────────────────
+const RAKUMA_FEE_OPTIONS = [
+  { label: '10%（通常）', value: 0.10  },
+  { label: '9%',          value: 0.09  },
+  { label: '8%',          value: 0.08  },
+  { label: '7%',          value: 0.07  },
+  { label: '6%',          value: 0.06  },
+  { label: '4.5%',        value: 0.045 },
+]
+const RAKUMA_FEE_KEY = 'rakuma_fee_rate'
 
 // ─────────────────────────────────────────
 // タブ定義
@@ -31,16 +43,74 @@ const TABS = [
 ]
 
 // ─────────────────────────────────────────
-// プラットフォームメタ情報（4つ）
+// プラットフォームメタ情報
 // ─────────────────────────────────────────
 const PLATFORM_META = {
-  mercari:  { label: 'メルカリ',     color: 'bg-red-500',     light: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-600'     },
-  yahoo:    { label: 'Yahoo!フリマ', color: 'bg-purple-500',  light: 'bg-purple-50',  border: 'border-purple-200',  text: 'text-purple-600'  },
-  rakuma:   { label: 'ラクマ',       color: 'bg-blue-900',    light: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-800'    },
-  yahuoku:  { label: 'ヤフオク',     color: 'bg-orange-500',  light: 'bg-orange-50',  border: 'border-orange-200',  text: 'text-orange-600'  },
+  mercari:  { label: 'メルカリ',     color: 'bg-red-500',    light: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600'    },
+  yahoo:    { label: 'Yahoo!フリマ', color: 'bg-purple-500', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
+  rakuma:   { label: 'ラクマ',       color: 'bg-blue-900',   light: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-800'   },
+  yahuoku:  { label: 'ヤフオク',     color: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600' },
 }
 
 const PLATFORMS = ['mercari', 'yahoo', 'rakuma', 'yahuoku']
+
+// ─────────────────────────────────────────
+// ラクマ手数料設定ポップオーバー
+// ─────────────────────────────────────────
+function RakumaFeeSelector({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const isChanged = value !== 0.10
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={[
+          'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition',
+          isChanged
+            ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+            : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200',
+        ].join(' ')}
+      >
+        <span className="w-2 h-2 rounded-full bg-blue-900 shrink-0" />
+        <span>ラクマ {(value * 100).toFixed(1).replace('.0', '')}%</span>
+        <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3 shrink-0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M4 6l4 4 4-4" />
+        </svg>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden min-w-[160px]">
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">ラクマ手数料率</p>
+            </div>
+            {RAKUMA_FEE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false) }}
+                className={[
+                  'w-full flex items-center justify-between px-3 py-2 text-sm transition',
+                  value === opt.value
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-gray-700 hover:bg-gray-50',
+                ].join(' ')}
+              >
+                <span>{opt.label}</span>
+                {value === opt.value && (
+                  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-blue-500" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M3 8l3.5 3.5L13 4" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // ─────────────────────────────────────────
 // 数値入力フィールド（共通）
@@ -67,47 +137,30 @@ function NumInput({ value, onChange, placeholder, suffix }) {
 // ─────────────────────────────────────────
 // プラットフォーム結果カラム
 // ─────────────────────────────────────────
-function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
+function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates }) {
   const meta     = PLATFORM_META[platform]
   const services = shippingOptions[platform]
+  const ov       = overrides[platform]
+  const rate     = feeRates[platform]   // ← feeRates から取得
 
-  const ov     = overrides[platform]
-  const selSvc = ov.service
-
-  // 選択中サービスのオブジェクト
-  const svcObj = services.find((s) => s.service === selSvc) || null
-  // 匿名配送以外かどうか
+  const selSvc        = ov.service
+  const svcObj        = services.find((s) => s.service === selSvc) || null
   const isNonAnonymous = svcObj ? svcObj.anonymous === false : false
+  const shipObj        = svcObj?.options.find((o) => o.value === ov.shipping)
 
-  // 選択中配送方法
-  const shipObj = svcObj?.options.find((o) => o.value === ov.shipping)
-
-  // 送料と梱包材の計算
-  // 匿名配送以外の場合：shipAndPackCost を送料＋梱包材の合算として使う
-  // 通常の場合：shipObj.fee を送料、packCost を梱包材として別々に使う
   const shipFee  = isNonAnonymous ? 0 : (shipObj ? shipObj.fee : 0)
   const packCost = isNonAnonymous
     ? (Number(ov.shipAndPackCost) || 0)
     : (Number(ov.packCost) || 0)
 
-  // 表示用の内訳
-  const shipAndPackDisplay = isNonAnonymous ? packCost : null
-
-  // 計算
   const sp     = Number(ov.sellPrice) || 0
   const bp     = Number(buyPrice)     || 0
-  const fee    = Math.round(calcFee(sp, feeRate[platform]))
+  const fee    = Math.round(calcFee(sp, rate))
   const profit = Math.round(calcProfit(sp, bp, fee, shipFee, packCost))
   const maxBuy = bp === 0 ? Math.floor(sp - fee - shipFee - packCost) : null
 
-  const profitPositive = profit > 0
-  const profitNegative = profit < 0
-
-  function set(key, val) {
-    onOverride(platform, { ...ov, [key]: val })
-  }
+  function set(key, val) { onOverride(platform, { ...ov, [key]: val }) }
   function handleServiceChange(val) {
-    // サービス切り替え時に配送方法・コストをリセット
     onOverride(platform, { ...ov, service: val, shipping: '', packCost: '0', shipAndPackCost: '' })
   }
 
@@ -119,7 +172,15 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
       {/* ヘッダー */}
       <div className={`${meta.color} px-2 py-2 flex items-center justify-between`}>
         <span className="text-white font-bold text-[11px] leading-tight">{meta.label}</span>
-        <span className="text-white/70 text-[9px]">{(feeRate[platform] * 100).toFixed(0)}%</span>
+        {/* 手数料率バッジ（ラクマが変更中は強調表示） */}
+        <span className={[
+          'text-[9px] font-semibold rounded px-1.5 py-0.5',
+          platform === 'rakuma' && rate !== 0.10
+            ? 'bg-yellow-300 text-yellow-900'
+            : 'text-white/70 bg-white/20',
+        ].join(' ')}>
+          {(rate * 100).toFixed(1).replace('.0', '')}%
+        </span>
       </div>
 
       <div className="px-2 py-2 flex flex-col gap-2 flex-1">
@@ -144,7 +205,6 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
             ))}
           </select>
 
-          {/* 匿名配送の場合のみ配送方法セレクト表示 */}
           {selSvc && !isNonAnonymous && (
             <select
               value={ov.shipping}
@@ -164,56 +224,40 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
           {isNonAnonymous ? (
             <>
               <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">送料＋梱包材</p>
-              <NumInput
-                value={ov.shipAndPackCost}
-                onChange={(v) => set('shipAndPackCost', v)}
-                placeholder="0"
-                suffix="円"
-              />
+              <NumInput value={ov.shipAndPackCost} onChange={(v) => set('shipAndPackCost', v)} placeholder="0" suffix="円" />
               <p className="text-[8px] text-gray-300 mt-0.5">送料と梱包材の合計を入力</p>
             </>
           ) : (
             <>
               <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">梱包材</p>
-              <NumInput
-                value={ov.packCost}
-                onChange={(v) => set('packCost', v)}
-                placeholder="0"
-                suffix="円"
-              />
+              <NumInput value={ov.packCost} onChange={(v) => set('packCost', v)} placeholder="0" suffix="円" />
             </>
           )}
         </div>
 
-        {/* 区切り */}
         <div className="border-t border-gray-100" />
 
         {/* 内訳 */}
         <div className="space-y-0.5 text-[9px] text-gray-400">
           <div className="flex justify-between">
-            <span>手数料</span>
-            <span>{fee.toLocaleString()}円</span>
+            <span>手数料</span><span>{fee.toLocaleString()}円</span>
           </div>
           {isNonAnonymous ? (
             <div className="flex justify-between">
-              <span>送料＋梱包材</span>
-              <span>{packCost.toLocaleString()}円</span>
+              <span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span>
             </div>
           ) : (
             <>
               <div className="flex justify-between">
-                <span>送料</span>
-                <span>{shipFee.toLocaleString()}円</span>
+                <span>送料</span><span>{shipFee.toLocaleString()}円</span>
               </div>
               <div className="flex justify-between">
-                <span>梱包材</span>
-                <span>{packCost.toLocaleString()}円</span>
+                <span>梱包材</span><span>{packCost.toLocaleString()}円</span>
               </div>
             </>
           )}
         </div>
 
-        {/* 区切り */}
         <div className="border-t border-gray-100" />
 
         {/* 利益 / 最大仕入れ */}
@@ -227,11 +271,11 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
           </div>
         ) : (
           <div className={`rounded-lg px-1 py-2 text-center ${
-            profitPositive ? meta.light : profitNegative ? 'bg-red-50' : 'bg-gray-50'
+            profit > 0 ? meta.light : profit < 0 ? 'bg-red-50' : 'bg-gray-50'
           }`}>
             <p className="text-[8px] text-gray-400 mb-0.5">販売利益</p>
             <p className={`text-xl font-black leading-none ${
-              profitPositive ? meta.text : profitNegative ? 'text-red-500' : 'text-gray-400'
+              profit > 0 ? meta.text : profit < 0 ? 'text-red-500' : 'text-gray-400'
             }`}>
               {profit > 0 ? '+' : ''}{profit.toLocaleString()}
             </p>
@@ -246,8 +290,7 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride }) {
 // ─────────────────────────────────────────
 // 計算機ページ
 // ─────────────────────────────────────────
-function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
-
+function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRates }) {
   const [globalSell, setGlobalSell]       = useState('')
   const [globalBuy,  setGlobalBuy]        = useState('')
   const [showPackInput, setShowPackInput] = useState(false)
@@ -279,7 +322,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
     setOverrides((prev) => ({ ...prev, [platform]: val }))
   }
 
-  // クリア系
   function clearAll()     { setGlobalSell(''); setGlobalBuy(''); setGlobalPack(''); setShowPackInput(false); setOverrides(initOverride()) }
   function clearSellAll() {
     setGlobalSell('')
@@ -305,7 +347,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
     })
   }
 
-  // 商品管理からロード
   const [prevLoaded, setPrevLoaded] = useState(null)
   if (loadedProduct && loadedProduct !== prevLoaded) {
     setPrevLoaded(loadedProduct)
@@ -330,7 +371,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
   return (
     <div className="w-full max-w-lg mx-auto flex flex-col gap-3">
 
-      {/* ロード中商品バナー */}
       {loadedProduct && (
         <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 flex items-center justify-between gap-2">
           <div>
@@ -373,24 +413,21 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
             />
           </div>
         </div>
-        {/* 梱包材費一括入力トグル */}
+
+        {/* 梱包材費一括入力 */}
         <div className="mt-3 border-t border-gray-100 pt-3">
           <button
             onClick={() => setShowPackInput((v) => !v)}
             className="w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition"
           >
-            <span className="flex items-center gap-1.5">
-              <span>📦</span> 梱包材費を一括入力
-            </span>
+            <span className="flex items-center gap-1.5"><span>📦</span> 梱包材費を一括入力</span>
             <span className={`text-gray-400 transition-transform ${showPackInput ? 'rotate-180' : ''}`}>▼</span>
           </button>
 
           {showPackInput && (
             <div className="mt-2 flex items-center gap-2">
               <input
-                type="text"
-                inputMode="numeric"
-                value={globalPack}
+                type="text" inputMode="numeric" value={globalPack}
                 onChange={(e) => {
                   const v = e.target.value
                   if (v === '' || /^[0-9]+$/.test(v)) setGlobalPack(v === '' ? '' : Number(v))
@@ -438,11 +475,12 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
             buyPrice={globalBuy}
             overrides={overrides}
             onOverride={handleOverride}
+            feeRates={feeRates}
           />
         ))}
       </div>
 
-      {/* 商品登録ボタン */}
+      {/* 登録ボタン */}
       <button
         onClick={handleRegisterFromCalc}
         className="w-full rounded-xl border border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition"
@@ -461,7 +499,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts }) {
           <button onClick={clearAll} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 transition">全てクリア</button>
         </div>
       </div>
-
     </div>
   )
 }
@@ -503,6 +540,24 @@ export default function App() {
   const [viewMode, setViewMode]   = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
+  // ラクマ手数料率（localStorage で永続保存）
+  const [rakumaFee, setRakumaFee] = useState(() => {
+    const saved = localStorage.getItem(RAKUMA_FEE_KEY)
+    return saved ? Number(saved) : 0.10
+  })
+  function handleRakumaFeeChange(val) {
+    setRakumaFee(val)
+    localStorage.setItem(RAKUMA_FEE_KEY, String(val))
+  }
+
+  // feeRates オブジェクト（全コンポーネントに渡す）
+  const feeRates = useMemo(() => ({
+    mercari:  defaultFeeRate.mercari,
+    yahoo:    defaultFeeRate.yahoo,
+    rakuma:   rakumaFee,               // ← ラクマのみ可変
+    yahuoku:  defaultFeeRate.yahuoku,
+  }), [rakumaFee])
+
   function handleViewModeChange(mode) {
     setViewMode(mode)
     localStorage.setItem('product_view_mode', mode)
@@ -522,23 +577,26 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+
+      {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between gap-3">
-          <h1 className="text-base font-bold text-gray-800 shrink-0">
+        <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
+          <h1 className="text-base font-bold text-gray-800 shrink-0 mr-auto">
             {activeTab === 'products' && '商品管理'}
             {activeTab === 'calc'     && '利益計算機'}
           </h1>
+
+          {/* 商品管理タブ：表示モード切り替え */}
           {activeTab === 'products' && (
             <ViewModeToggle viewMode={viewMode} onChange={handleViewModeChange} />
           )}
-          {activeTab === 'products' && loadedProduct && (
-            <span className="rounded-full bg-blue-100 text-blue-600 text-xs font-semibold px-2.5 py-1 ml-auto truncate max-w-[140px]">
-              計算機:「{loadedProduct.name}」
-            </span>
-          )}
+
+          {/* 全タブ共通：ラクマ手数料設定 */}
+          <RakumaFeeSelector value={rakumaFee} onChange={handleRakumaFeeChange} />
         </div>
       </header>
 
+      {/* メイン */}
       <main className="pb-24 pt-4 px-3">
         <div className={activeTab === 'products' ? 'block' : 'hidden'}>
           <ProductManager
@@ -547,6 +605,7 @@ export default function App() {
             addBtnId="product-manager-add-btn"
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
+            feeRates={feeRates}
           />
         </div>
         <div className={activeTab === 'calc' ? 'block' : 'hidden'}>
@@ -554,6 +613,7 @@ export default function App() {
             loadedProduct={loadedProduct}
             setLoadedProduct={setLoadedProduct}
             onSwitchToProducts={handleSwitchToProducts}
+            feeRates={feeRates}
           />
         </div>
       </main>
