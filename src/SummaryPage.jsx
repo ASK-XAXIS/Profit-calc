@@ -75,13 +75,13 @@ function PieChart({ data, size = 120 }) {
 }
 
 // ── 集計カード ─────────────────────────────────────────────
-function SummaryCard({ label, value, color = 'text-gray-800', prefix = '¥' }) {
+function SummaryCard({ label, value, color = 'text-gray-800', prefix = '¥', suffix = '円' }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-3">
       <p className="text-[10px] text-gray-400 mb-1">{label}</p>
       <p className={`text-base font-black leading-none ${color}`}>
         {prefix}{Number(value).toLocaleString()}
-        <span className="text-xs font-normal ml-0.5">円</span>
+        <span className="text-xs font-normal ml-0.5">{suffix}</span>
       </p>
     </div>
   )
@@ -467,7 +467,7 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
             <div className="grid grid-cols-3 gap-2">
               <SummaryCard label="売上" value={totalAgg.sellPrice} color="text-blue-600" />
               <SummaryCard label="純利益" value={totalAgg.profit} color={totalAgg.profit >= 0 ? 'text-emerald-600' : 'text-red-500'} />
-              <SummaryCard label="販売数" value={totalAgg.count} prefix="" />
+              <SummaryCard label="販売数" value={totalAgg.count} prefix="" suffix="件" />
               <SummaryCard label="手数料合計" value={totalAgg.fee} color="text-red-500" />
               <SummaryCard label="送料合計" value={totalAgg.shippingFee} color="text-orange-500" />
               <SummaryCard label="梱包材費合計" value={totalAgg.packCost} color="text-purple-500" />
