@@ -1,9 +1,9 @@
-// feeConfig.jsx  ← .js → .jsx に変更（JSXを含むため）
+// feeConfig.jsx
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 // ─────────────────────────────────────────
-// 手数料設定の定数
+// 定数・ユーティリティ
 // ─────────────────────────────────────────
 export const RAKUMA_FEE_OPTIONS = [
   { label: '10%（通常）', value: 0.10  },
@@ -31,59 +31,75 @@ export function feeLabel(rate) {
 
 // ─────────────────────────────────────────
 // FeeBadge
-// ラクマのみタップでプルダウン変更可能
-// createPortal で body 直下に描画
-// → overflow:hidden / z-index に影響されない
 // ─────────────────────────────────────────
-export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
+// ドロップダウンは createPortal + position:fixed で描画
+// → overflow:hidden / スクロールコンテナ / z-index に一切影響されない
+// → スマホ・モーダル内・計算機カード内すべてで正常動作
+//
+// Props:
+//   platform      : プラットフォームkey ('rakuma' のみ変更可)
+//   feeRate       : 現在の手数料率
+//   onFeeChange   : (newRate: number) => void
+//   dark          : ヘッダー背景が暗い場合 true（デフォルト true）
+//   label         : バッジ左側に表示するテキスト（ヘッダー用）
+export function FeeBadge({ platform, feeRate, onFeeChange, dark = true, label }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos]   = useState({ top: 0, right: 0 })
-  const btnRef          = useRef(null)
-  const isRakuma        = platform === 'rakuma'
-  const isChanged       = isRakuma && feeRate !== 0.10
+  // fixed座標（viewport基準）で管理
+  const [fixedPos, setFixedPos] = useState({ top: 0, right: 0 })
+  const btnRef  = useRef(null)
+  const isRakuma  = platform === 'rakuma'
+  const isChanged = isRakuma && Math.abs(feeRate - 0.10) > 0.0001
 
-  function handleOpen() {
+  function openMenu(e) {
+    e.stopPropagation()
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
-      setPos({
-        top:   rect.bottom + window.scrollY + 4,
+      // fixed座標 = viewport座標（scrollY不要）
+      setFixedPos({
+        top:   rect.bottom + 4,
         right: window.innerWidth - rect.right,
       })
     }
     setOpen(true)
   }
 
-  // スクロール・リサイズで閉じる
+  // スクロール・リサイズ・Escape で閉じる
   useEffect(() => {
     if (!open) return
     const close = () => setOpen(false)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
+    window.addEventListener('scroll',  close, true)
+    window.addEventListener('resize',  close)
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
     return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
+      window.removeEventListener('scroll',  close, true)
+      window.removeEventListener('resize',  close)
     }
   }, [open])
 
-  // ラクマ以外は固定表示のみ（タップ不可）
+  const displayText = label
+    ? `${label} ${feeLabel(feeRate)}`
+    : feeLabel(feeRate)
+
+  // ラクマ以外：固定表示のみ
   if (!isRakuma) {
     return (
       <span className={[
-        'text-[10px] font-semibold rounded px-1.5 py-0.5 select-none',
+        'text-[10px] font-semibold rounded px-1.5 py-0.5 select-none whitespace-nowrap',
         dark ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-500',
       ].join(' ')}>
-        {feeLabel(feeRate)}
+        {displayText}
       </span>
     )
   }
 
   return (
     <>
+      {/* トリガーボタン */}
       <button
         ref={btnRef}
-        onPointerDown={(e) => { e.stopPropagation(); handleOpen() }}
+        onPointerDown={openMenu}
         className={[
-          'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold transition select-none',
+          'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold select-none whitespace-nowrap transition-opacity active:opacity-70',
           isChanged
             ? 'bg-yellow-300 text-yellow-900'
             : dark
@@ -92,30 +108,33 @@ export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
         ].join(' ')}
         title="タップして手数料率を変更"
       >
-        {feeLabel(feeRate)}
+        {displayText}
         <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2 shrink-0"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M2 3.5l3 3 3-3" />
         </svg>
       </button>
 
+      {/* Portal: body直下に fixed で描画 */}
       {open && createPortal(
         <>
-          {/* 透明オーバーレイ */}
+          {/* 透明オーバーレイ（タップで閉じる） */}
           <div
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-            onPointerDown={() => setOpen(false)}
+            onPointerDown={(e) => { e.stopPropagation(); setOpen(false) }}
           />
+
           {/* ドロップダウン本体 */}
           <div
             style={{
-              position: 'absolute',
-              top:      pos.top,
-              right:    pos.right,
+              position: 'fixed',          // ← fixed に統一（スクロール量不要）
+              top:      fixedPos.top,
+              right:    fixedPos.right,
               zIndex:   9999,
               minWidth: '160px',
             }}
             className="bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
@@ -131,15 +150,15 @@ export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
                   setOpen(false)
                 }}
                 className={[
-                  'w-full flex items-center justify-between px-3 py-2.5 text-sm transition',
-                  feeRate === opt.value
+                  'w-full flex items-center justify-between px-3 py-2.5 text-sm transition-colors',
+                  Math.abs(feeRate - opt.value) < 0.0001
                     ? 'bg-blue-50 text-blue-700 font-bold'
                     : 'text-gray-700 active:bg-gray-100',
                 ].join(' ')}
               >
                 <span>{opt.label}</span>
-                {feeRate === opt.value && (
-                  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-blue-500"
+                {Math.abs(feeRate - opt.value) < 0.0001 && (
+                  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-blue-500 shrink-0"
                     stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <path d="M3 8l3.5 3.5L13 4" />
                   </svg>
