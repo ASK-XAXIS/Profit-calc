@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
-import { RAKUMA_FEE_OPTIONS, RAKUMA_FEE_KEY, loadRakumaFee, saveRakumaFee, feeLabel } from './feeConfig'
+import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig'
 import ProductManager, { ViewModeToggle } from './ProductManager'
 
 // ─────────────────────────────────────────
@@ -41,80 +41,6 @@ const PLATFORM_META = {
 }
 
 const PLATFORMS = ['mercari', 'yahoo', 'rakuma', 'yahuoku']
-
-// ─────────────────────────────────────────
-// 手数料バッジ（ラクマのみタップで変更可）
-// 計算機・シミュレーション共通で使用
-// ─────────────────────────────────────────
-export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
-  const [open, setOpen] = useState(false)
-  const isRakuma  = platform === 'rakuma'
-  const isChanged = isRakuma && feeRate !== 0.10
-
-  // ラクマ以外は固定表示のみ
-  if (!isRakuma) {
-    return (
-      <span className={[
-        'text-[10px] font-semibold rounded px-1.5 py-0.5',
-        dark ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-500',
-      ].join(' ')}>
-        {feeLabel(feeRate)}
-      </span>
-    )
-  }
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={[
-          'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold transition',
-          isChanged
-            ? 'bg-yellow-300 text-yellow-900 hover:bg-yellow-200'
-            : dark
-              ? 'bg-white/20 text-white hover:bg-white/30'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200',
-        ].join(' ')}
-        title="タップして手数料率を変更"
-      >
-        {feeLabel(feeRate)}
-        <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2 shrink-0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
-          <path d="M2 3.5l3 3 3-3" />
-        </svg>
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-[70] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden min-w-[155px]">
-            <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">ラクマ手数料率</p>
-            </div>
-            {RAKUMA_FEE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => { onFeeChange(opt.value); setOpen(false) }}
-                className={[
-                  'w-full flex items-center justify-between px-3 py-2 text-sm transition',
-                  feeRate === opt.value
-                    ? 'bg-blue-50 text-blue-700 font-bold'
-                    : 'text-gray-700 hover:bg-gray-50',
-                ].join(' ')}
-              >
-                <span>{opt.label}</span>
-                {feeRate === opt.value && (
-                  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-blue-500" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M3 8l3.5 3.5L13 4" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────
 // 数値入力フィールド
@@ -170,7 +96,7 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, o
       {/* ヘッダー */}
       <div className={`${meta.color} px-2 py-2 flex items-center justify-between`}>
         <span className="text-white font-bold text-[11px] leading-tight">{meta.label}</span>
-        {/* 手数料バッジ（ラクマのみタップで変更可） */}
+        {/* FeeBadge: Portal方式で確実に動作 */}
         <FeeBadge
           platform={platform}
           feeRate={rate}
@@ -292,14 +218,14 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
   function clearAll()     { setGlobalSell(''); setGlobalBuy(''); setGlobalPack(''); setShowPackInput(false); setOverrides(initOverride()) }
   function clearSellAll() {
     setGlobalSell('')
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],sellPrice:''}; return n })
+    setOverrides((prev) => { const n = {...prev}; for (const pf of PLATFORMS) n[pf] = {...prev[pf], sellPrice: ''}; return n })
   }
   function clearShipAll() {
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],service:'',shipping:'',shipAndPackCost:''}; return n })
+    setOverrides((prev) => { const n = {...prev}; for (const pf of PLATFORMS) n[pf] = {...prev[pf], service: '', shipping: '', shipAndPackCost: ''}; return n })
   }
   function clearPackAll() {
     setGlobalPack('')
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],packCost:'0',shipAndPackCost:''}; return n })
+    setOverrides((prev) => { const n = {...prev}; for (const pf of PLATFORMS) n[pf] = {...prev[pf], packCost: '0', shipAndPackCost: ''}; return n })
   }
 
   const [prevLoaded, setPrevLoaded] = useState(null)
@@ -465,17 +391,15 @@ export default function App() {
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
-  // ラクマ手数料率（localStorage で永続保存）
+  // ラクマ手数料率
   const [rakumaFee, setRakumaFee] = useState(loadRakumaFee)
 
   function handleFeeRatesChange(newRates) {
-    // ラクマのみ変更可能
     const val = newRates.rakuma ?? rakumaFee
     setRakumaFee(val)
     saveRakumaFee(val)
   }
 
-  // feeRates オブジェクト（全コンポーネントに渡す）
   const feeRates = useMemo(() => ({
     mercari:  defaultFeeRate.mercari,
     yahoo:    defaultFeeRate.yahoo,
@@ -502,7 +426,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
           <h1 className="text-base font-bold text-gray-800 shrink-0 mr-auto">

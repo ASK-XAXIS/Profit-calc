@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import { buildSimulation, findBestRow } from './simulationEngine'
 import { getSearchUrl, fetchMarketPrice } from './priceSearchAdapter'
-import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig'
+import { feeLabel, FeeBadge } from './feeConfig'
 
 const PLATFORM_LABEL = {
   mercari: 'メルカリ',
@@ -37,72 +37,6 @@ function MarketSearchButton({ productName, platform, onPriceFound }) {
   )
 }
 
-// ── 手数料バッジ（ラクマのみタップでプルダウン） ──────────
-function FeeBadge({ platform, feeRate, onFeeChange }) {
-  const [open, setOpen] = useState(false)
-  const isRakuma    = platform === 'rakuma'
-  const isChanged   = isRakuma && feeRate !== 0.10
-
-  if (!isRakuma) {
-    // ラクマ以外は固定表示
-    return (
-      <span className="text-white/80 text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5">
-        {feeLabel(feeRate)}
-      </span>
-    )
-  }
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={[
-          'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold transition',
-          isChanged
-            ? 'bg-yellow-300 text-yellow-900 hover:bg-yellow-200'
-            : 'bg-white/20 text-white hover:bg-white/30',
-        ].join(' ')}
-        title="タップして手数料率を変更"
-      >
-        {feeLabel(feeRate)}
-        <svg viewBox="0 0 10 10" fill="currentColor" className="w-2 h-2 shrink-0">
-          <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-        </svg>
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-[70] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden min-w-[150px]">
-            <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">ラクマ手数料率</p>
-            </div>
-            {RAKUMA_FEE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => { onFeeChange(opt.value); setOpen(false) }}
-                className={[
-                  'w-full flex items-center justify-between px-3 py-2 text-sm transition',
-                  feeRate === opt.value
-                    ? 'bg-pink-50 text-pink-700 font-bold'
-                    : 'text-gray-700 hover:bg-gray-50',
-                ].join(' ')}
-              >
-                <span>{opt.label}</span>
-                {feeRate === opt.value && (
-                  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-pink-500" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M3 8l3.5 3.5L13 4" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 // ── プラットフォーム列 ────────────────────────────────────
 function PlatformColumn({
   platform, rows, bestKey, feeRate, onFeeChange,
@@ -130,8 +64,13 @@ function PlatformColumn({
       <div className={`${s.header} px-3 py-2.5`}>
         <div className="flex items-center justify-between gap-1">
           <p className="font-bold text-sm text-white">{PLATFORM_LABEL[platform]}</p>
-          {/* 手数料バッジ（ラクマのみタップで変更可） */}
-          <FeeBadge platform={platform} feeRate={feeRate} onFeeChange={onFeeChange} />
+          {/* FeeBadge は feeConfig からimport、Portal方式で確実に動作 */}
+          <FeeBadge
+            platform={platform}
+            feeRate={feeRate}
+            onFeeChange={onFeeChange}
+            dark={true}
+          />
         </div>
 
         {/* 販売額編集 */}
@@ -171,7 +110,6 @@ function PlatformColumn({
           const key          = `${row.platform}-${row.shippingValue}`
           const isGlobalBest = key === bestKey
           const isSelected   = key === selectedKey
-
           return (
             <label key={i}
               className={[
@@ -218,21 +156,19 @@ export default function SimulationModal({ product, feeRates, onFeeRatesChange, o
   const [packCost, setPackCost] = useState(
     product.packCost !== '' && product.packCost !== undefined ? String(product.packCost) : '0'
   )
-
   const initSellPrice = product.sellPrice !== '' && product.sellPrice !== undefined
     ? Number(product.sellPrice) : 0
 
   const [sellPrices, setSellPrices] = useState({
     mercari: initSellPrice, yahoo: initSellPrice, rakuma: initSellPrice, yahuoku: initSellPrice,
   })
-
   const [selectedRow, setSelectedRow] = useState(null)
 
   function updateSellPrice(platform, price) {
     setSellPrices((prev) => ({ ...prev, [platform]: price }))
   }
 
-  // ラクマ手数料変更（親の onFeeRatesChange を呼んで全体に反映）
+  // ラクマ手数料変更 → 親の onFeeRatesChange を呼んで App 全体に反映
   function handleFeeChange(platform, val) {
     if (onFeeRatesChange) onFeeRatesChange({ ...feeRates, [platform]: val })
   }
@@ -242,7 +178,7 @@ export default function SimulationModal({ product, feeRates, onFeeRatesChange, o
     buyPrice:  product.buyPrice,
     packCost,
     thickness: product.thickness,
-    feeRates,                        // ← 常に最新の手数料率で計算
+    feeRates,
   }), [sellPrices, product.buyPrice, packCost, product.thickness, feeRates])
 
   const bestRow     = useMemo(() => findBestRow(allRows), [allRows])
@@ -338,7 +274,7 @@ export default function SimulationModal({ product, feeRates, onFeeRatesChange, o
         {/* ヒント */}
         <div className="px-5 py-2 bg-blue-50 border-b border-blue-100 shrink-0">
           <p className="text-[10px] text-blue-500">
-            💡 ラジオボタンで販売ルートを選択 → 「この販売ルートで登録」で保存。ラクマの手数料率はヘッダーの%をタップして変更できます。
+            💡 ラジオボタンで販売ルートを選択 → 「この販売ルートで登録」で保存。ラクマの%をタップすると手数料率を変更できます。
           </p>
         </div>
 
