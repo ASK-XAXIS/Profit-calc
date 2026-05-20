@@ -12,23 +12,22 @@ function filterOptionsByThickness(options, thicknessCm) {
 
 /**
  * @param {object} params
- * @param {object} params.sellPriceOverrides - { mercari, yahoo, rakuma, yahuoku } 上書き売値
+ * @param {object} params.sellPriceOverrides - { mercari, yahoo, rakuma, yahuoku }
  * @param {number|string} params.buyPrice
  * @param {number|string} params.packCost
  * @param {number|string} params.thickness
- * @param {object} [params.feeRates] - { mercari, yahoo, rakuma, yahuoku } 上書き手数料率（省略時はdefault）
+ * @param {object} [params.feeRates] - { mercari, yahoo, rakuma, yahuoku } 省略時はdefault
  */
 export function buildSimulation({ sellPriceOverrides, buyPrice, packCost, thickness, feeRates }) {
-  // デフォルト手数料率に上書き分をマージ
+  // デフォルト手数料率に呼び出し元の上書き分をマージ
   const rates = { ...defaultFeeRate, ...(feeRates || {}) }
   const rows = []
 
   for (const [platformKey, services] of Object.entries(shippingOptions)) {
-    const rate      = rates[platformKey]
+    const rate      = rates[platformKey]          // ← 必ず上書き済みの率を使用
     const sellPrice = Number(sellPriceOverrides[platformKey]) || 0
 
     for (const serviceObj of services) {
-      // 匿名配送以外はシミュレーション対象外
       if (serviceObj.anonymous === false) continue
 
       const filteredOptions = filterOptionsByThickness(serviceObj.options, thickness)
