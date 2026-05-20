@@ -1,8 +1,8 @@
 // SummaryPage.jsx
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   getAllSales, saveSale, deleteSale, createEmptySale,
-  aggregateSales, platformRanking, toMonth, toYear, calcSaleProfit,
+  aggregateSales, platformRanking, toMonth, toYear,
 } from './salesStore'
 import { feeRate as defaultFeeRate } from './constants'
 import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig.jsx'
@@ -30,31 +30,46 @@ const PLATFORM_OPTIONS = [
 
 const ic = "w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
 
+// 純利益を計算
+function calcSaleProfit(s) {
+  return (
+    (Number(s.sellPrice)   || 0) -
+    (Number(s.buyPrice)    || 0) -
+    (Number(s.fee)         || 0) -
+    (Number(s.shippingFee) || 0) -
+    (Number(s.packCost)    || 0)
+  )
+}
+
+// 手数料自動計算
+function autoFee(sellPrice, platform, feeRates) {
+  const sp   = Number(sellPrice) || 0
+  const rate = feeRates?.[platform] ?? defaultFeeRate[platform] ?? 0
+  return sp && rate ? Math.round(sp * rate) : 0
+}
+
 // ── ミニ円グラフ ──────────────────────────────────────────
 function PieChart({ data, size = 120 }) {
-  // data: [{ label, value, color }]
   const total = data.reduce((s, d) => s + d.value, 0)
   if (total === 0) return <div className="text-xs text-gray-400 text-center py-4">データなし</div>
 
   let cumAngle = -Math.PI / 2
   const cx = size / 2, cy = size / 2, r = size / 2 - 4
 
-  function slice(value) {
-    const angle = (value / total) * 2 * Math.PI
+  const paths = data.map((d) => {
+    const angle = (d.value / total) * 2 * Math.PI
     const x1 = cx + r * Math.cos(cumAngle)
     const y1 = cy + r * Math.sin(cumAngle)
     cumAngle += angle
     const x2 = cx + r * Math.cos(cumAngle)
     const y2 = cy + r * Math.sin(cumAngle)
     const large = angle > Math.PI ? 1 : 0
-    return `M${cx},${cy} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} Z`
-  }
+    return { d: `M${cx},${cy} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} Z`, color: d.color }
+  })
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {data.map((d, i) => (
-        <path key={i} d={slice(d.value)} fill={d.color} opacity={0.9} />
-      ))}
+      {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} opacity={0.9} />)}
     </svg>
   )
 }
@@ -72,26 +87,43 @@ function SummaryCard({ label, value, color = 'text-gray-800', prefix = '¥' }) {
   )
 }
 
+// ── 純利益プレビューバー ──────────────────────────────────
+function ProfitPreview({ s }) {
+  const profit = calcSaleProfit(s)
+  const color  = profit > 0 ? 'text-emerald-600' : profit < 0 ? 'text-red-500' : 'text-gray-400'
+  return (
+    <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-500">純利益（自動計算）</span>
+        <span className={`text-xl font-black ${color}`}>
+          {profit > 0 ? '+' : ''}{profit.toLocaleString()}円
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-gray-400">
+        <span>売上 ¥{Number(s.sellPrice)||0}</span>
+        <span>仕入 ¥{Number(s.buyPrice)||0}</span>
+        <span>手数料 ¥{Number(s.fee)||0}</span>
+        <span>送料 ¥{Number(s.shippingFee)||0}</span>
+        <span>梱包 ¥{Number(s.packCost)||0}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── 売上編集モーダル ──────────────────────────────────────
-function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
-  const [s, setS] = useState({ ...initial,
+function SaleEditModal({ sale: initial, feeRates, onSave, onDelete, onClose }) {
+  const [s, setS] = useState({
+    ...initial,
     sellPrice:   String(initial.sellPrice   ?? ''),
     buyPrice:    String(initial.buyPrice    ?? ''),
     fee:         String(initial.fee         ?? ''),
     shippingFee: String(initial.shippingFee ?? ''),
     packCost:    String(initial.packCost    ?? ''),
-    profit:      String(initial.profit      ?? ''),
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   function set(key, val) {
-    setS((prev) => {
-      const next = { ...prev, [key]: val }
-      const profit = (Number(next.sellPrice)||0) - (Number(next.buyPrice)||0)
-        - (Number(next.fee)||0) - (Number(next.shippingFee)||0) - (Number(next.packCost)||0)
-      next.profit = String(profit)
-      return next
-    })
+    setS((prev) => ({ ...prev, [key]: val }))
   }
 
   function numericInput(key) {
@@ -99,6 +131,13 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
       const v = e.target.value
       if (v === '' || /^[0-9]+$/.test(v)) set(key, v)
     }
+  }
+
+  function handlePlatformChange(pf) {
+    setS((prev) => {
+      const fee = autoFee(prev.sellPrice, pf, feeRates)
+      return { ...prev, platform: pf, fee: fee ? String(fee) : prev.fee }
+    })
   }
 
   function handleSave() {
@@ -109,11 +148,9 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
       fee:         Number(s.fee)         || 0,
       shippingFee: Number(s.shippingFee) || 0,
       packCost:    Number(s.packCost)    || 0,
-      profit:      Number(s.profit)      || 0,
+      profit:      calcSaleProfit(s),
     })
   }
-
-  const profitNum = Number(s.profit) || 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -122,21 +159,18 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
           <h2 className="text-white font-bold">売上詳細を編集</h2>
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         </div>
-
         <div className="px-6 py-5 max-h-[68vh] overflow-y-auto space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">商品名</label>
-            <input type="text" value={s.productName}
-              onChange={(e) => set('productName', e.target.value)} className={ic} />
+            <input type="text" value={s.productName} onChange={(e) => set('productName', e.target.value)} className={ic} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">売れた日付</label>
-            <input type="date" value={s.soldDate}
-              onChange={(e) => set('soldDate', e.target.value)} className={ic} />
+            <input type="date" value={s.soldDate} onChange={(e) => set('soldDate', e.target.value)} className={ic} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">プラットフォーム</label>
-            <select value={s.platform} onChange={(e) => set('platform', e.target.value)} className={ic}>
+            <select value={s.platform} onChange={(e) => handlePlatformChange(e.target.value)} className={ic}>
               <option value="">未設定</option>
               {PLATFORM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -150,27 +184,15 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
           ].map(({ key, label }) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-600 mb-1">{label}</label>
-              <input type="text" inputMode="numeric" value={s[key]}
-                onChange={numericInput(key)} className={ic} />
+              <input type="text" inputMode="numeric" value={s[key]} onChange={numericInput(key)} className={ic} />
             </div>
           ))}
-
-          <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">純利益（自動計算）</span>
-              <span className={`text-xl font-black ${profitNum >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {profitNum >= 0 ? '+' : ''}{profitNum.toLocaleString()}円
-              </span>
-            </div>
-          </div>
+          <ProfitPreview s={s} />
         </div>
-
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
           {!confirmDelete ? (
             <button onClick={() => setConfirmDelete(true)}
-              className="rounded-lg px-3 py-2 text-xs font-semibold text-red-400 bg-red-50 hover:bg-red-100 transition">
-              削除
-            </button>
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-red-400 bg-red-50 hover:bg-red-100 transition">削除</button>
           ) : (
             <div className="flex gap-2">
               <button onClick={() => onDelete(s.id)}
@@ -180,10 +202,8 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
             </div>
           )}
           <div className="flex gap-2 ml-auto">
-            <button onClick={onClose}
-              className="rounded-lg px-5 py-2 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition">キャンセル</button>
-            <button onClick={handleSave}
-              className="rounded-lg px-5 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition">保存</button>
+            <button onClick={onClose} className="rounded-lg px-5 py-2 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition">キャンセル</button>
+            <button onClick={handleSave} className="rounded-lg px-5 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition">保存</button>
           </div>
         </div>
       </div>
@@ -192,29 +212,23 @@ function SaleEditModal({ sale: initial, onSave, onDelete, onClose }) {
 }
 
 // ── 新規売上登録モーダル ──────────────────────────────────
-function NewSaleModal({ onSave, onClose, feeRates }) {
-  const [s, setS] = useState(createEmptySale())
+function NewSaleModal({ onSave, onClose, feeRates, onFeeRatesChange }) {
+  const [s, setS] = useState({
+    id:          crypto.randomUUID(),
+    productId:   '',
+    productName: '',
+    soldDate:    new Date().toISOString().slice(0, 10),
+    platform:    '',
+    sellPrice:   '',
+    buyPrice:    '',
+    fee:         '',
+    shippingFee: '',
+    packCost:    '',
+  })
+  const [errors, setErrors] = useState({})
 
   function set(key, val) {
-    setS((prev) => {
-      const next = { ...prev, [key]: val }
-      const profit = (Number(next.sellPrice)||0) - (Number(next.buyPrice)||0)
-        - (Number(next.fee)||0) - (Number(next.shippingFee)||0) - (Number(next.packCost)||0)
-      next.profit = String(profit)
-      return next
-    })
-  }
-
-  function handlePlatformChange(pf) {
-    const rate = feeRates?.[pf] ?? defaultFeeRate[pf] ?? 0
-    const sp = Number(s.sellPrice) || 0
-    const fee = sp && rate ? String(Math.round(sp * rate)) : s.fee
-    setS((prev) => {
-      const next = { ...prev, platform: pf, fee }
-      const profit = sp - (Number(next.buyPrice)||0) - (Number(fee)||0) - (Number(next.shippingFee)||0) - (Number(next.packCost)||0)
-      next.profit = String(profit)
-      return next
-    })
+    setS((prev) => ({ ...prev, [key]: val }))
   }
 
   function numericInput(key) {
@@ -224,7 +238,31 @@ function NewSaleModal({ onSave, onClose, feeRates }) {
     }
   }
 
-  const [errors, setErrors] = useState({})
+  function handlePlatformChange(pf) {
+    setS((prev) => {
+      const fee = autoFee(prev.sellPrice, pf, feeRates)
+      return { ...prev, platform: pf, fee: fee ? String(fee) : '' }
+    })
+  }
+
+  function handleSellPriceChange(val) {
+    if (val !== '' && !/^[0-9]+$/.test(val)) return
+    setS((prev) => {
+      const fee = autoFee(val, prev.platform, feeRates)
+      return { ...prev, sellPrice: val, fee: fee ? String(fee) : '' }
+    })
+  }
+
+  function handleRakumaFeeChange(newRate) {
+    // ローカルのfeeを更新
+    setS((prev) => {
+      const fee = prev.sellPrice ? String(Math.round(Number(prev.sellPrice) * newRate)) : ''
+      return { ...prev, fee }
+    })
+    // App全体に反映
+    if (onFeeRatesChange) onFeeRatesChange({ ...feeRates, rakuma: newRate })
+  }
+
   function handleSave() {
     const e = {}
     if (!s.soldDate)        e.soldDate  = '日付を入力してください'
@@ -238,11 +276,9 @@ function NewSaleModal({ onSave, onClose, feeRates }) {
       fee:         Number(s.fee)         || 0,
       shippingFee: Number(s.shippingFee) || 0,
       packCost:    Number(s.packCost)    || 0,
-      profit:      Number(s.profit)      || 0,
+      profit:      calcSaleProfit(s),
     })
   }
-
-  const profitNum = Number(s.profit) || 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -252,16 +288,20 @@ function NewSaleModal({ onSave, onClose, feeRates }) {
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 max-h-[68vh] overflow-y-auto space-y-3">
+
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">商品名 <span className="text-red-400">*</span></label>
-            <input type="text" value={s.productName} onChange={(e) => set('productName', e.target.value)} className={ic} placeholder="例：ヴィンテージTシャツ" />
+            <input type="text" value={s.productName} onChange={(e) => set('productName', e.target.value)}
+              placeholder="例：ヴィンテージTシャツ" className={ic} />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">売れた日付 <span className="text-red-400">*</span></label>
             <input type="date" value={s.soldDate} onChange={(e) => set('soldDate', e.target.value)} className={ic} />
             {errors.soldDate && <p className="text-xs text-red-500 mt-1">{errors.soldDate}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">プラットフォーム</label>
             <select value={s.platform} onChange={(e) => handlePlatformChange(e.target.value)} className={ic}>
@@ -269,30 +309,57 @@ function NewSaleModal({ onSave, onClose, feeRates }) {
               {PLATFORM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          {[
-            { key: 'sellPrice',   label: '売上額（円）', required: true },
-            { key: 'buyPrice',    label: '仕入れ値（円）' },
-            { key: 'fee',         label: '手数料（円）' },
-            { key: 'shippingFee', label: '送料（円）' },
-            { key: 'packCost',    label: '梱包材費（円）' },
-          ].map(({ key, label, required }) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
-                {label}{required && <span className="text-red-400 ml-1">*</span>}
-              </label>
-              <input type="text" inputMode="numeric" value={s[key]} onChange={numericInput(key)} className={ic} />
-              {key === 'sellPrice' && errors.sellPrice && <p className="text-xs text-red-500 mt-1">{errors.sellPrice}</p>}
+
+          {/* ラクマ選択時：手数料率セレクト */}
+          {s.platform === 'rakuma' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">ラクマ手数料率</label>
+              <select
+                value={feeRates?.rakuma ?? 0.10}
+                onChange={(e) => handleRakumaFeeChange(Number(e.target.value))}
+                className={ic}
+              >
+                {RAKUMA_FEE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">全領域に即時反映されます</p>
             </div>
-          ))}
-          <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">純利益（自動計算）</span>
-              <span className={`text-xl font-black ${profitNum >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {profitNum >= 0 ? '+' : ''}{profitNum.toLocaleString()}円
-              </span>
-            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">売上額（円） <span className="text-red-400">*</span></label>
+            <input type="text" inputMode="numeric" value={s.sellPrice}
+              onChange={(e) => handleSellPriceChange(e.target.value)} className={ic} />
+            {errors.sellPrice && <p className="text-xs text-red-500 mt-1">{errors.sellPrice}</p>}
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">仕入れ値（円）</label>
+            <input type="text" inputMode="numeric" value={s.buyPrice} onChange={numericInput('buyPrice')} className={ic} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">
+              手数料（円）<span className="ml-2 text-[10px] text-gray-400 font-normal">自動計算</span>
+            </label>
+            <input type="text" inputMode="numeric" value={s.fee} onChange={numericInput('fee')} className={ic} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">送料（円）</label>
+            <input type="text" inputMode="numeric" value={s.shippingFee} onChange={numericInput('shippingFee')} className={ic} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">梱包材費（円）</label>
+            <input type="text" inputMode="numeric" value={s.packCost} onChange={numericInput('packCost')} className={ic} />
+          </div>
+
+          {/* リアルタイム損益プレビュー */}
+          <ProfitPreview s={s} />
         </div>
+
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
           <button onClick={onClose} className="rounded-lg px-5 py-2 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition">キャンセル</button>
           <button onClick={handleSave} className="rounded-lg px-5 py-2 text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition">登録する</button>
@@ -303,33 +370,37 @@ function NewSaleModal({ onSave, onClose, feeRates }) {
 }
 
 // ── メインページ ──────────────────────────────────────────
-export default function SummaryPage({ feeRates }) {
+export default function SummaryPage({ feeRates, onFeeRatesChange }) {
   const [sales, setSales]           = useState([])
-  const [period, setPeriod]         = useState('month')   // 'day' | 'month' | 'year'
-  const [viewType, setViewType]     = useState('number')  // 'number' | 'chart'
+  const [period, setPeriod]         = useState('month')
+  const [viewType, setViewType]     = useState('number')
   const [showDetail, setShowDetail] = useState(false)
   const [editingSale, setEditingSale]     = useState(null)
   const [showNewSale, setShowNewSale]     = useState(false)
-  const [selectedGroup, setSelectedGroup] = useState(null) // 詳細表示する期間グループ
+  const [selectedGroup, setSelectedGroup] = useState(null)
 
+  // 初回ロード
   useEffect(() => { setSales(getAllSales()) }, [])
 
-  function refresh() { setSales(getAllSales()) }
+  // salesStore から sales-updated イベントを受け取って即時リフレッシュ
+  useEffect(() => {
+    function onUpdate() { setSales(getAllSales()) }
+    window.addEventListener('sales-updated', onUpdate)
+    return () => window.removeEventListener('sales-updated', onUpdate)
+  }, [])
 
   function handleSaveSale(sale) {
-    saveSale(sale)
-    refresh()
+    saveSale(sale) // saveSale内でsales-updatedを発火 → useEffectで自動リフレッシュ
     setEditingSale(null)
     setShowNewSale(false)
   }
 
   function handleDeleteSale(id) {
-    deleteSale(id)
-    refresh()
+    deleteSale(id) // deleteSale内でsales-updatedを発火
     setEditingSale(null)
   }
 
-  // 期間でグループ化
+  // 期間グループ化
   const grouped = useMemo(() => {
     const map = {}
     for (const s of sales) {
@@ -339,31 +410,25 @@ export default function SummaryPage({ feeRates }) {
       if (!map[key]) map[key] = []
       map[key].push(s)
     }
-    // 降順ソート
     return Object.entries(map)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, items]) => ({ key, items, agg: aggregateSales(items) }))
   }, [sales, period])
 
-  // 全体集計
   const totalAgg = useMemo(() => aggregateSales(sales), [sales])
+  const ranking  = useMemo(() => platformRanking(sales), [sales])
 
-  // プラットフォームランキング
-  const ranking = useMemo(() => platformRanking(sales), [sales])
-
-  // 円グラフ用データ（利益内訳）
   const pieData = useMemo(() => {
     if (totalAgg.sellPrice === 0) return []
     return [
-      { label: '純利益',    value: Math.max(totalAgg.profit, 0),      color: '#10b981' },
-      { label: '手数料',    value: totalAgg.fee,                       color: '#ef4444' },
-      { label: '送料',      value: totalAgg.shippingFee,               color: '#f97316' },
-      { label: '梱包材費',  value: totalAgg.packCost,                  color: '#a855f7' },
-      { label: '仕入れ',    value: totalAgg.buyPrice,                  color: '#64748b' },
+      { label: '純利益',   value: Math.max(totalAgg.profit, 0), color: '#10b981' },
+      { label: '手数料',   value: totalAgg.fee,                  color: '#ef4444' },
+      { label: '送料',     value: totalAgg.shippingFee,          color: '#f97316' },
+      { label: '梱包材費', value: totalAgg.packCost,             color: '#a855f7' },
+      { label: '仕入れ',   value: totalAgg.buyPrice,             color: '#64748b' },
     ].filter((d) => d.value > 0)
   }, [totalAgg])
 
-  // プラットフォーム別売上グラフ用
   const pfPieData = useMemo(() =>
     ranking.map((r) => ({
       label: PLATFORM_LABEL[r.platform] || r.platform,
@@ -371,29 +436,20 @@ export default function SummaryPage({ feeRates }) {
       color: PLATFORM_COLOR[r.platform] || '#9ca3af',
     })), [ranking])
 
-  const periodLabel = { day: '日別', month: '月別', year: '年別' }[period]
-
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-4">
 
-      {/* ── ヘッダー操作エリア ── */}
+      {/* 操作エリア */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-3 flex items-center gap-2 flex-wrap">
-        {/* 期間切り替え */}
         <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
           {[['day','日別'],['month','月別'],['year','年別']].map(([v,l]) => (
             <button key={v} onClick={() => setPeriod(v)}
               className={['rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                period === v ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-400'].join(' ')}>
-              {l}
-            </button>
+                period === v ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-400'].join(' ')}>{l}</button>
           ))}
         </div>
-
-        {/* 新規登録 */}
-        <button
-          onClick={() => setShowNewSale(true)}
-          className="ml-auto flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition"
-        >
+        <button onClick={() => setShowNewSale(true)}
+          className="ml-auto flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition">
           ＋ 売上登録
         </button>
       </div>
@@ -405,7 +461,7 @@ export default function SummaryPage({ feeRates }) {
         </div>
       ) : (
         <>
-          {/* ── 全体集計サマリ ── */}
+          {/* 全体集計 */}
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-1">全期間合計</p>
             <div className="grid grid-cols-3 gap-2">
@@ -418,32 +474,24 @@ export default function SummaryPage({ feeRates }) {
             </div>
           </div>
 
-          {/* ── 表示切り替え（数字 / グラフ） ── */}
+          {/* 表示切り替え */}
           <div className="flex items-center gap-2">
             <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
               {[['number','数字'],['chart','グラフ']].map(([v,l]) => (
                 <button key={v} onClick={() => setViewType(v)}
                   className={['rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                    viewType === v ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-400'].join(' ')}>
-                  {l}
-                </button>
+                    viewType === v ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-400'].join(' ')}>{l}</button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 ml-1">{periodLabel}の内訳</p>
-            {/* 詳細表示トグル */}
             <button
               onClick={() => setShowDetail((v) => !v)}
               className={['ml-auto rounded-lg px-3 py-1.5 text-xs font-semibold border transition',
-                showDetail
-                  ? 'bg-blue-50 border-blue-300 text-blue-600'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-              ].join(' ')}
-            >
+                showDetail ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'].join(' ')}>
               {showDetail ? '詳細を閉じる' : '詳細を表示'}
             </button>
           </div>
 
-          {/* ── グラフビュー ── */}
+          {/* グラフビュー */}
           {viewType === 'chart' && (
             <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
               <p className="text-xs font-semibold text-gray-500 mb-3">売上内訳（全期間）</p>
@@ -454,14 +502,11 @@ export default function SummaryPage({ feeRates }) {
                     <div key={d.label} className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                       <span className="text-xs text-gray-600">{d.label}</span>
-                      <span className="text-xs font-semibold text-gray-800 ml-auto pl-2">
-                        ¥{d.value.toLocaleString()}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-800 ml-auto pl-2">¥{d.value.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
               </div>
-
               {pfPieData.length > 0 && (
                 <>
                   <p className="text-xs font-semibold text-gray-500 mt-4 mb-3">プラットフォーム別販売数</p>
@@ -482,25 +527,18 @@ export default function SummaryPage({ feeRates }) {
             </div>
           )}
 
-          {/* ── プラットフォームランキング（詳細時） ── */}
+          {/* プラットフォームランキング */}
           {showDetail && ranking.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
               <p className="text-xs font-semibold text-gray-500 mb-3">📊 フリマアプリ販売ランキング</p>
               <div className="space-y-2">
                 {ranking.map((r, i) => (
                   <div key={r.platform} className="flex items-center gap-3">
-                    <span className={[
-                      'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                      i === 0 ? 'bg-yellow-400 text-yellow-900'
-                      : i === 1 ? 'bg-gray-300 text-gray-700'
-                      : i === 2 ? 'bg-amber-600 text-white'
-                      : 'bg-gray-100 text-gray-500',
-                    ].join(' ')}>
-                      {i + 1}
+                    <span className={['w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                      i===0?'bg-yellow-400 text-yellow-900':i===1?'bg-gray-300 text-gray-700':i===2?'bg-amber-600 text-white':'bg-gray-100 text-gray-500'].join(' ')}>
+                      {i+1}
                     </span>
-                    <span className="text-sm font-semibold text-gray-700 flex-1">
-                      {PLATFORM_LABEL[r.platform] || r.platform}
-                    </span>
+                    <span className="text-sm font-semibold text-gray-700 flex-1">{PLATFORM_LABEL[r.platform] || r.platform}</span>
                     <span className="text-sm font-bold text-blue-600">{r.count}件</span>
                   </div>
                 ))}
@@ -508,11 +546,10 @@ export default function SummaryPage({ feeRates }) {
             </div>
           )}
 
-          {/* ── 期間別リスト ── */}
+          {/* 期間別リスト */}
           <div className="space-y-3">
             {grouped.map(({ key, items, agg }) => (
               <div key={key} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                {/* 期間ヘッダー */}
                 <button
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
                   onClick={() => setSelectedGroup(selectedGroup === key ? null : key)}
@@ -536,7 +573,6 @@ export default function SummaryPage({ feeRates }) {
                   </div>
                 </button>
 
-                {/* 数字ビュー（展開時） */}
                 {viewType === 'number' && selectedGroup === key && (
                   <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-3 gap-2">
                     <SummaryCard label="売上" value={agg.sellPrice} color="text-blue-600" />
@@ -548,15 +584,11 @@ export default function SummaryPage({ feeRates }) {
                   </div>
                 )}
 
-                {/* 詳細リスト（showDetail時） */}
                 {showDetail && selectedGroup === key && (
                   <div className="border-t border-gray-100 divide-y divide-gray-50">
                     {items.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setEditingSale(s)}
-                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition text-left"
-                      >
+                      <button key={s.id} onClick={() => setEditingSale(s)}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition text-left">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-gray-800 truncate">{s.productName}</p>
                           <p className="text-[10px] text-gray-400">
@@ -579,22 +611,22 @@ export default function SummaryPage({ feeRates }) {
         </>
       )}
 
-      {/* 編集モーダル */}
       {editingSale && (
         <SaleEditModal
           sale={editingSale}
+          feeRates={feeRates}
           onSave={handleSaveSale}
           onDelete={handleDeleteSale}
           onClose={() => setEditingSale(null)}
         />
       )}
 
-      {/* 新規登録モーダル */}
       {showNewSale && (
         <NewSaleModal
           onSave={handleSaveSale}
           onClose={() => setShowNewSale(false)}
           feeRates={feeRates}
+          onFeeRatesChange={onFeeRatesChange}
         />
       )}
     </div>
