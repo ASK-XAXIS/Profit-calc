@@ -438,7 +438,7 @@ export default function App() {
           />
         </div>
         <div className={activeTab === 'summary' ? 'block' : 'hidden'}>
-          <SummaryPage feeRates={feeRates} />
+          <SummaryPage feeRates={feeRates} onFeeRatesChange={handleFeeRatesChange} />
         </div>
       </main>
 
