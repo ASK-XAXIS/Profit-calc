@@ -509,18 +509,32 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
               </div>
               {pfPieData.length > 0 && (
                 <>
-                  <p className="text-xs font-semibold text-gray-500 mt-4 mb-3">プラットフォーム別販売数</p>
-                  <div className="flex items-center gap-4">
-                    <PieChart data={pfPieData} size={110} />
-                    <div className="flex flex-col gap-1.5">
-                      {pfPieData.map((d, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                          <span className="text-xs text-gray-600">{d.label}</span>
-                          <span className="text-xs font-semibold text-gray-800 ml-auto pl-2">{d.value}件</span>
+                  <p className="text-xs font-semibold text-gray-500 mt-5 mb-3">プラットフォーム別販売数</p>
+                  <div className="space-y-2.5">
+                    {(() => {
+                      const maxVal = Math.max(...pfPieData.map((d) => d.value))
+                      return pfPieData.map((d, i) => (
+                        <div key={i}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                              <span className="text-xs text-gray-600">{d.label}</span>
+                            </div>
+                            <span className="text-xs font-bold text-gray-700">{d.value}件</span>
+                          </div>
+                          <div className="h-5 w-full bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${maxVal > 0 ? (d.value / maxVal) * 100 : 0}%`,
+                                background: d.color,
+                                opacity: 0.85,
+                              }}
+                            />
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    })()}
                   </div>
                 </>
               )}
