@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
-import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig'
+import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig.jsx'
 import ProductManager, { ViewModeToggle } from './ProductManager'
 
 // ─────────────────────────────────────────

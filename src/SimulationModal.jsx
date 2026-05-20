@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import { buildSimulation, findBestRow } from './simulationEngine'
 import { getSearchUrl, fetchMarketPrice } from './priceSearchAdapter'
-import { feeLabel, FeeBadge } from './feeConfig'
+import { feeLabel, FeeBadge } from './feeConfig.jsx'
 
 const PLATFORM_LABEL = {
   mercari: 'メルカリ',

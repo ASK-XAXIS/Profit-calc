@@ -1,4 +1,4 @@
-// feeConfig.js
+// feeConfig.jsx  ← .js → .jsx に変更（JSXを含むため）
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -32,17 +32,16 @@ export function feeLabel(rate) {
 // ─────────────────────────────────────────
 // FeeBadge
 // ラクマのみタップでプルダウン変更可能
-// ドロップダウンは createPortal で body 直下に描画
-// → overflow:hidden / z-index に一切影響されない
+// createPortal で body 直下に描画
+// → overflow:hidden / z-index に影響されない
 // ─────────────────────────────────────────
 export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
-  const [open, setOpen]       = useState(false)
-  const [pos, setPos]         = useState({ top: 0, right: 0 })
-  const btnRef                = useRef(null)
-  const isRakuma              = platform === 'rakuma'
-  const isChanged             = isRakuma && feeRate !== 0.10
+  const [open, setOpen] = useState(false)
+  const [pos, setPos]   = useState({ top: 0, right: 0 })
+  const btnRef          = useRef(null)
+  const isRakuma        = platform === 'rakuma'
+  const isChanged       = isRakuma && feeRate !== 0.10
 
-  // ボタン位置を計算してポータルの表示位置に使う
   function handleOpen() {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
@@ -58,15 +57,15 @@ export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
   useEffect(() => {
     if (!open) return
     const close = () => setOpen(false)
-    window.addEventListener('scroll',  close, true)
-    window.addEventListener('resize',  close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
     return () => {
       window.removeEventListener('scroll', close, true)
       window.removeEventListener('resize', close)
     }
   }, [open])
 
-  // ラクマ以外は固定表示のみ
+  // ラクマ以外は固定表示のみ（タップ不可）
   if (!isRakuma) {
     return (
       <span className={[
@@ -102,7 +101,7 @@ export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
 
       {open && createPortal(
         <>
-          {/* 透明オーバーレイ（body直下 → タッチ問題なし） */}
+          {/* 透明オーバーレイ */}
           <div
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
             onPointerDown={() => setOpen(false)}
@@ -110,11 +109,11 @@ export function FeeBadge({ platform, feeRate, onFeeChange, dark = true }) {
           {/* ドロップダウン本体 */}
           <div
             style={{
-              position:  'absolute',
-              top:       pos.top,
-              right:     pos.right,
-              zIndex:    9999,
-              minWidth:  '160px',
+              position: 'absolute',
+              top:      pos.top,
+              right:    pos.right,
+              zIndex:   9999,
+              minWidth: '160px',
             }}
             className="bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
           >
