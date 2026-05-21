@@ -28,12 +28,14 @@ export function saveProduct(product) {
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(products))
+  window.dispatchEvent(new CustomEvent('products-updated'))
   return { success: true }
 }
 
 export function deleteProduct(id) {
   const products = getAllProducts().filter((p) => p.id !== id)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(products))
+  window.dispatchEvent(new CustomEvent('products-updated'))
 }
 
 export function createEmptyProduct() {

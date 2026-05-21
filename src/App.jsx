@@ -543,6 +543,17 @@ export default function App() {
           {activeTab === 'products' && (
             <ViewModeToggle viewMode={viewMode} onChange={handleViewModeChange} />
           )}
+          {/* リロードボタン */}
+          <button
+            onClick={() => window.location.reload()}
+            title="リロード"
+            className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4v5h5M20 20v-5h-5" />
+              <path d="M4 9a9 9 0 0114.65-3.65L20 9M4 15l1.35 3.65A9 9 0 0020 15" />
+            </svg>
+          </button>
         </div>
       </header>
 

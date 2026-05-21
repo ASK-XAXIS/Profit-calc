@@ -912,6 +912,14 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
   const [search, setSearch]                       = useState('')
 
   useEffect(() => { setProducts(getAllProducts()) }, [])
+
+  // productStore の変更（BundlePage からの在庫更新など）を即時反映
+  useEffect(() => {
+    function onUpdate() { setProducts(getAllProducts()) }
+    window.addEventListener('products-updated', onUpdate)
+    return () => window.removeEventListener('products-updated', onUpdate)
+  }, [])
+
   function refresh() { setProducts(getAllProducts()) }
 
   function openAdd()         { setEditingProduct(createEmptyProduct()); setShowModal(true) }
