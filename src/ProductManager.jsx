@@ -486,6 +486,53 @@ function StockBadge({ stock }) {
 }
 
 // ─────────────────────────────────────────
+// 説明文の折りたたみ表示
+// ─────────────────────────────────────────
+const DESCRIPTION_LIMIT = 300
+
+function DescriptionBlock({ text }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = text.length > DESCRIPTION_LIMIT
+
+  const displayed = isLong && !expanded
+    ? text.slice(0, DESCRIPTION_LIMIT)
+    : text
+
+  return (
+    <div>
+      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+        {displayed}
+        {isLong && !expanded && (
+          <span className="text-gray-400">…</span>
+        )}
+      </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-xs font-semibold text-blue-500 hover:text-blue-700 transition flex items-center gap-1"
+        >
+          {expanded ? (
+            <>
+              <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 10l4-4 4 4" />
+              </svg>
+              閉じる
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+              もっと読む（残り{text.length - DESCRIPTION_LIMIT}文字）
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────
 // コピーボタン
 // ─────────────────────────────────────────
 function CopyButton({ text, className = '' }) {
@@ -668,7 +715,7 @@ function ProductDetailPage({ product, onEdit, onBack, onSold, onSimulate }) {
                 <p className="text-[10px] text-gray-400">商品説明文</p>
                 <CopyButton text={product.description} />
               </div>
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+              <DescriptionBlock text={product.description} />
             </div>
           ) : (
             <div className="bg-white rounded-2xl px-4 py-3 flex items-center justify-between">
