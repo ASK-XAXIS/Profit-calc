@@ -1,7 +1,7 @@
 // BundlePage.jsx
 // 複数商品をまとめて販売するときの価格計算・損益差表示
 import { useState, useMemo, useEffect } from 'react'
-import { getAllProducts } from './productStore'
+import { getAllProducts, saveProduct } from './productStore'
 import { saveSale } from './salesStore'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
@@ -295,7 +295,13 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
 
   // 売れた！保存
   function handleSoldSave(sale) {
+    // まとめ売りの売上を登録
     saveSale(sale)
+    // 各商品の在庫を1つずつ減らす
+    for (const p of selected) {
+      const newStock = Math.max((Number(p.stock) || 1) - 1, 0)
+      saveProduct({ ...p, stock: newStock })
+    }
     setShowSoldModal(false)
   }
 
