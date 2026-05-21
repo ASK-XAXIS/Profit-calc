@@ -113,58 +113,105 @@ function ProductSelectModal({ selected, onSelect, onClose }) {
   )
 }
 
-// ── 売れた！登録モーダル（個別商品用） ────────────────────
-function BundleSoldModal({ product, bundlePlatform, soldDate, onSave, onClose, feeRates }) {
-  const [sellPrice, setSellPrice] = useState(
-    product.sellPrice !== '' ? String(product.sellPrice) : ''
-  )
+// ── まとめ売り 一括登録モーダル ──────────────────────────
+// まとめ売り全体を1件として損益集計に登録する
+function BundleSoldModal({ selected, bundlePlatform, soldDate, bundleSellPrice, bundleProfit, bundleFee, shipFee, packCostNum, feeRates, onSave, onClose }) {
+  const [totalSell, setTotalSell] = useState(String(bundleSellPrice || ''))
+  const [date, setDate]           = useState(soldDate)
+
+  const totalBuy = selected.reduce((s, p) => s + (Number(p.buyPrice) || 0), 0)
+  const sp       = Number(totalSell) || 0
+  const rate     = feeRates?.[bundlePlatform] ?? defaultFeeRate[bundlePlatform] ?? 0
+  const fee      = Math.round(sp * rate)
+  const profit   = sp - totalBuy - fee - (Number(shipFee) || 0) - (Number(packCostNum) || 0)
+
+  const names = selected.map((p) => p.name).join('、')
+
   function handleSave() {
-    const sp   = Number(sellPrice) || 0
-    const bp   = Number(product.buyPrice) || 0
-    const pf   = bundlePlatform
-    const rate = feeRates?.[pf] ?? defaultFeeRate[pf] ?? 0
-    const fee  = Math.round(sp * rate)
+    // まとめ売りを1件のレコードとして登録
     onSave({
       id:          crypto.randomUUID(),
-      productId:   product.id,
-      productName: product.name,
-      soldDate,
-      platform:    pf,
+      productId:   '',   // 複数商品のためIDなし
+      productName: `【まとめ売り】${names}`,
+      soldDate:    date,
+      platform:    bundlePlatform,
       sellPrice:   sp,
-      buyPrice:    bp,
+      buyPrice:    totalBuy,
       fee,
-      shippingFee: 0,   // まとめ売りは送料を個別に割り当てない
-      packCost:    0,
-      profit:      sp - bp - fee,
+      shippingFee: Number(shipFee) || 0,
+      packCost:    Number(packCostNum) || 0,
+      profit,
+      isBundle:    true,    // まとめ売りフラグ
+      bundleCount: selected.length,
     })
   }
+
+  const ic = "w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+  const pColor = profit >= 0 ? 'text-emerald-600' : 'text-red-500'
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="bg-emerald-500 px-5 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-white font-bold text-sm">売れた！登録</h2>
-            <p className="text-emerald-100 text-xs truncate">{product.name}</p>
+            <h2 className="text-white font-bold">まとめ売り 登録</h2>
+            <p className="text-emerald-100 text-xs mt-0.5">{selected.length}商品 / 損益集計に1件で登録</p>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         </div>
+
         <div className="px-5 py-4 space-y-3">
+          {/* 商品一覧（確認用） */}
+          <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 space-y-1">
+            {selected.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-2 text-xs">
+                <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold flex items-center justify-center shrink-0">{i+1}</span>
+                <span className="text-gray-700 truncate flex-1">{p.name}</span>
+                <span className="text-gray-400 shrink-0">¥{Number(p.buyPrice).toLocaleString()}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-xs pt-1 border-t border-gray-200 text-gray-500 font-semibold">
+              <span>仕入れ合計</span>
+              <span>¥{totalBuy.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* 売れた日付 */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">売上額（円）</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">売れた日付</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={ic} />
+          </div>
+
+          {/* 売上額 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">まとめ売り総額（円）</label>
             <input
-              type="text" inputMode="numeric" value={sellPrice}
-              onChange={(e) => { if (e.target.value === '' || /^[0-9]+$/.test(e.target.value)) setSellPrice(e.target.value) }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-              placeholder="個別の売上額を入力"
+              type="text" inputMode="numeric" value={totalSell}
+              onChange={(e) => { if (e.target.value === '' || /^[0-9]+$/.test(e.target.value)) setTotalSell(e.target.value) }}
+              placeholder="例：5000" className={ic}
             />
-            <p className="text-[10px] text-gray-400 mt-1">まとめ売りの場合は按分額を入力してください</p>
           </div>
-          <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-500 space-y-0.5">
-            <div className="flex justify-between"><span>仕入れ値</span><span>¥{Number(product.buyPrice).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span>プラットフォーム</span><span>{PLATFORM_META[bundlePlatform]?.label || bundlePlatform}</span></div>
-            <div className="flex justify-between"><span>売れた日付</span><span>{soldDate}</span></div>
+
+          {/* リアルタイム損益プレビュー */}
+          <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-500">純利益</span>
+              <span className={`text-xl font-black ${pColor}`}>
+                {profit >= 0 ? '+' : ''}{profit.toLocaleString()}円
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-400">
+              <span>手数料 ¥{fee.toLocaleString()}</span>
+              <span>送料 ¥{Number(shipFee)||0}</span>
+              <span>梱包 ¥{Number(packCostNum)||0}</span>
+            </div>
           </div>
+
+          <p className="text-[10px] text-gray-400 bg-blue-50 rounded-lg px-3 py-2">
+            💡 損益集計モードに「【まとめ売り】」として1件で登録されます。販売件数は1件としてカウントされます。
+          </p>
         </div>
+
         <div className="px-5 py-3 border-t border-gray-100 flex gap-2">
           <button onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition">キャンセル</button>
           <button onClick={handleSave} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition">登録する</button>
@@ -187,8 +234,8 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
   const [offerPrice, setOfferPrice] = useState('')  // 客の希望金額
 
   // 売れた！関連
-  const [soldDate,   setSoldDate]   = useState(() => new Date().toISOString().slice(0, 10))
-  const [soldTarget, setSoldTarget] = useState(null)  // BundleSoldModalの対象商品
+  const [soldDate,       setSoldDate]     = useState(() => new Date().toISOString().slice(0, 10))
+  const [showSoldModal,  setShowSoldModal] = useState(false)  // まとめ売り一括登録モーダル
 
   // プラットフォーム変更時リセット
   function handlePlatformChange(pf) {
@@ -249,7 +296,7 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
   // 売れた！保存
   function handleSoldSave(sale) {
     saveSale(sale)
-    setSoldTarget(null)
+    setShowSoldModal(false)
   }
 
   const ic = "w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
@@ -493,23 +540,15 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
               <label className="block text-xs font-medium text-gray-500 mb-1">売れた日付</label>
               <input type="date" value={soldDate} onChange={(e) => setSoldDate(e.target.value)} className={ic} />
             </div>
-            <p className="text-[10px] text-gray-400">各商品の「売れた！」ボタンを押すと損益集計に登録されます。</p>
-            <div className="space-y-2">
-              {selected.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-700 truncate">{p.name}</p>
-                    <p className="text-[10px] text-gray-400">仕入れ ¥{Number(p.buyPrice).toLocaleString()}</p>
-                  </div>
-                  <button
-                    onClick={() => setSoldTarget(p)}
-                    className="shrink-0 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
-                  >
-                    🎉 売れた！
-                  </button>
-                </div>
-              ))}
-            </div>
+            <p className="text-[10px] text-gray-400">
+              まとめ売り全体を損益集計に1件として登録します。
+            </p>
+            <button
+              onClick={() => setShowSoldModal(true)}
+              className="w-full rounded-xl border border-emerald-300 bg-emerald-50 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+            >
+              🎉 まとめ売りで売れた！登録する
+            </button>
           </div>
         </div>
       )}
@@ -523,15 +562,20 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
         />
       )}
 
-      {/* 売れた！モーダル */}
-      {soldTarget && (
+      {/* まとめ売り一括登録モーダル */}
+      {showSoldModal && (
         <BundleSoldModal
-          product={soldTarget}
+          selected={selected}
           bundlePlatform={platform}
           soldDate={soldDate}
+          bundleSellPrice={bundleSellPrice}
+          bundleProfit={bundleProfit}
+          bundleFee={bundleFee}
+          shipFee={shipFee}
+          packCostNum={packCostNum}
           feeRates={feeRates}
           onSave={handleSoldSave}
-          onClose={() => setSoldTarget(null)}
+          onClose={() => setShowSoldModal(false)}
         />
       )}
     </div>
