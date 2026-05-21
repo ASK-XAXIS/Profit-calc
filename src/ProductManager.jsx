@@ -753,7 +753,7 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
           </div>
         )}
       </div>
-      <button onClick={() => onDetail(product)} className="px-2 py-2 flex flex-col gap-1 text-left">
+      <button onClick={() => onDetail(product)} className="px-2 py-2 flex flex-col gap-1 text-left w-full">
         <p className="font-semibold text-gray-800 text-xs leading-snug line-clamp-2">{product.name}</p>
         <StockBadge stock={product.stock} />
         <p className="text-[10px] text-gray-500">¥{Number(product.buyPrice).toLocaleString()}</p>
@@ -762,7 +762,7 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
             {PLATFORM_LABEL[route.platform] || route.platform} {route.profit >= 0 ? '+' : ''}{route.profit.toLocaleString()}円
           </span>
         )}
-      </div>
+      </button>
     </div>
   )
 }
