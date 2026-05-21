@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
-import { calcFee, calcProfit } from './calc'
+import { calcFee, calcProfit, calcBreakEven } from './calc'
 import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig.jsx'
 import ProductManager, { ViewModeToggle } from './ProductManager'
 import SummaryPage from './SummaryPage'
@@ -53,15 +53,17 @@ const PLATFORM_META = {
   rakuma:   { label: 'ラクマ',       color: 'bg-blue-900',   light: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-800'   },
   yahuoku:  { label: 'ヤフオク',     color: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600' },
 }
+
 const PLATFORMS = ['mercari', 'yahoo', 'rakuma', 'yahuoku']
 
 // ─────────────────────────────────────────
-// 数値入力
+// 数値入力フィールド
 // ─────────────────────────────────────────
 function NumInput({ value, onChange, placeholder, suffix }) {
   return (
     <div className="flex items-center gap-0.5">
-      <input type="text" inputMode="numeric" value={value}
+      <input
+        type="text" inputMode="numeric" value={value}
         onChange={(e) => {
           const v = e.target.value
           if (v === '' || /^[0-9]+$/.test(v)) onChange(v === '' ? '' : Number(v))
@@ -77,7 +79,7 @@ function NumInput({ value, onChange, placeholder, suffix }) {
 // ─────────────────────────────────────────
 // 計算機：プラットフォーム結果カラム
 // ─────────────────────────────────────────
-function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, onFeeRatesChange }) {
+function PlatformColumn({ platform, globalSell, buyPrice, overrides, onOverride, feeRates, onFeeRatesChange }) {
   const meta     = PLATFORM_META[platform]
   const services = shippingOptions[platform]
   const ov       = overrides[platform]
@@ -91,30 +93,60 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, o
   const shipFee  = isNonAnonymous ? 0 : (shipObj ? shipObj.fee : 0)
   const packCost = isNonAnonymous ? (Number(ov.shipAndPackCost) || 0) : (Number(ov.packCost) || 0)
 
-  const sp     = Number(ov.sellPrice) || 0
-  const bp     = Number(buyPrice)     || 0
+  const sp = Number(ov.sellPrice) || 0
+  const bp = Number(buyPrice)     || 0
+
+  // 販売価格が入力されているかどうか（グローバル売値 or 個別上書き）
+  const hasSellPrice = ov.sellPrice !== '' && ov.sellPrice !== 0
+
   const fee    = Math.round(calcFee(sp, rate))
   const profit = Math.round(calcProfit(sp, bp, fee, shipFee, packCost))
-  const maxBuy = bp === 0 ? Math.floor(sp - fee - shipFee - packCost) : null
+
+  // 最高仕入れ額（販売価格入力済・仕入れ未入力のとき）
+  const maxBuy = !hasSellPrice && bp === 0
+    ? null  // 両方未入力 → 何も計算しない
+    : null  // 使わない
+
+  // 最低販売価格（仕入れ入力済・販売価格未入力のとき）
+  // 損益ゼロになる最低売価 = ceil((buyPrice + shipFee + packCost) / (1 - rate))
+  const minSellPrice = !hasSellPrice && bp > 0
+    ? Math.ceil((bp + shipFee + packCost) / (1 - rate))
+    : null
 
   function set(key, val) { onOverride(platform, { ...ov, [key]: val }) }
   function handleServiceChange(val) {
     onOverride(platform, { ...ov, service: val, shipping: '', packCost: '0', shipAndPackCost: '' })
   }
 
+  // 表示モードを決定
+  // A: 販売価格入力済 → 利益表示
+  // B: 仕入れ入力済・販売価格未入力 → 最低販売価格表示
+  // C: 両方未入力 → 空表示
+  const displayMode = hasSellPrice ? 'profit'
+    : bp > 0 ? 'minSell'
+    : 'empty'
+
   return (
     <div className={`flex flex-col rounded-xl overflow-hidden border ${meta.border} bg-white`}>
+      {/* ヘッダー */}
       <div className={`${meta.color} px-2 py-2 flex items-center justify-between`}>
         <span className="text-white font-bold text-[11px] leading-tight">{meta.label}</span>
-        <FeeBadge platform={platform} feeRate={rate}
-          onFeeChange={(val) => onFeeRatesChange({ ...feeRates, [platform]: val })} dark={true} />
+        <FeeBadge
+          platform={platform}
+          feeRate={rate}
+          onFeeChange={(val) => onFeeRatesChange({ ...feeRates, [platform]: val })}
+          dark={true}
+        />
       </div>
 
       <div className="px-2 py-2 flex flex-col gap-2 flex-1">
+        {/* 販売価格 */}
         <div>
           <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">販売価格</p>
           <NumInput value={ov.sellPrice} onChange={(v) => set('sellPrice', v)} placeholder="---" suffix="円" />
         </div>
+
+        {/* 発送サービス */}
         <div>
           <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">発送</p>
           <select value={selSvc} onChange={(e) => handleServiceChange(e.target.value)}
@@ -130,11 +162,14 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, o
             </select>
           )}
         </div>
+
+        {/* 梱包材費 */}
         <div>
           {isNonAnonymous ? (
             <>
               <p className="text-[8px] text-gray-400 mb-0.5 uppercase tracking-wide">送料＋梱包材</p>
               <NumInput value={ov.shipAndPackCost} onChange={(v) => set('shipAndPackCost', v)} placeholder="0" suffix="円" />
+              <p className="text-[8px] text-gray-300 mt-0.5">送料と梱包材の合計を入力</p>
             </>
           ) : (
             <>
@@ -146,35 +181,68 @@ function PlatformColumn({ platform, buyPrice, overrides, onOverride, feeRates, o
 
         <div className="border-t border-gray-100" />
 
+        {/* 内訳 */}
         <div className="space-y-0.5 text-[9px] text-gray-400">
-          <div className="flex justify-between"><span>手数料</span><span>{fee.toLocaleString()}円</span></div>
-          {isNonAnonymous ? (
-            <div className="flex justify-between"><span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span></div>
-          ) : (
+          {displayMode === 'profit' && (
             <>
-              <div className="flex justify-between"><span>送料</span><span>{shipFee.toLocaleString()}円</span></div>
-              <div className="flex justify-between"><span>梱包材</span><span>{packCost.toLocaleString()}円</span></div>
+              <div className="flex justify-between"><span>手数料</span><span>{fee.toLocaleString()}円</span></div>
+              {isNonAnonymous ? (
+                <div className="flex justify-between"><span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span></div>
+              ) : (
+                <>
+                  <div className="flex justify-between"><span>送料</span><span>{shipFee.toLocaleString()}円</span></div>
+                  <div className="flex justify-between"><span>梱包材</span><span>{packCost.toLocaleString()}円</span></div>
+                </>
+              )}
             </>
+          )}
+          {displayMode === 'minSell' && (
+            <>
+              {isNonAnonymous ? (
+                <div className="flex justify-between"><span>送料＋梱包材</span><span>{packCost.toLocaleString()}円</span></div>
+              ) : (
+                <>
+                  <div className="flex justify-between"><span>送料</span><span>{shipFee.toLocaleString()}円</span></div>
+                  <div className="flex justify-between"><span>梱包材</span><span>{packCost.toLocaleString()}円</span></div>
+                </>
+              )}
+              <div className="flex justify-between"><span>手数料率</span><span>{(rate * 100).toFixed(1).replace('.0', '')}%</span></div>
+            </>
+          )}
+          {displayMode === 'empty' && (
+            <p className="text-[8px] text-gray-300 text-center py-1">販売価格または仕入れ額を入力</p>
           )}
         </div>
 
         <div className="border-t border-gray-100" />
 
-        {bp === 0 ? (
-          <div className="text-center py-1">
-            <p className="text-[8px] text-gray-400 mb-0.5">最高仕入れ額</p>
-            <p className={`text-xl font-black leading-none ${maxBuy > 0 ? meta.text : 'text-gray-300'}`}>
-              {maxBuy > 0 ? maxBuy.toLocaleString() : '---'}
-            </p>
-            {maxBuy > 0 && <p className="text-[8px] text-gray-400 mt-0.5">円まで可</p>}
-          </div>
-        ) : (
+        {/* ── 結果表示エリア ── */}
+        {displayMode === 'profit' && (
+          // A: 販売利益
           <div className={`rounded-lg px-1 py-2 text-center ${profit > 0 ? meta.light : profit < 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
             <p className="text-[8px] text-gray-400 mb-0.5">販売利益</p>
             <p className={`text-xl font-black leading-none ${profit > 0 ? meta.text : profit < 0 ? 'text-red-500' : 'text-gray-400'}`}>
               {profit > 0 ? '+' : ''}{profit.toLocaleString()}
             </p>
             <p className="text-[8px] text-gray-400 mt-0.5">円</p>
+          </div>
+        )}
+
+        {displayMode === 'minSell' && (
+          // B: 最低販売価格
+          <div className={`rounded-lg px-1 py-2 text-center ${meta.light}`}>
+            <p className="text-[8px] text-gray-500 mb-0.5 font-semibold">最低販売価格</p>
+            <p className={`text-xl font-black leading-none ${meta.text}`}>
+              {minSellPrice !== null ? minSellPrice.toLocaleString() : '---'}
+            </p>
+            <p className="text-[8px] text-gray-400 mt-0.5">円（損益±0）</p>
+          </div>
+        )}
+
+        {displayMode === 'empty' && (
+          // C: 未入力
+          <div className="rounded-lg px-1 py-2 text-center bg-gray-50">
+            <p className="text-[8px] text-gray-300 mb-0.5">---</p>
           </div>
         )}
       </div>
@@ -216,17 +284,32 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     setOverrides((prev) => ({ ...prev, [platform]: val }))
   }
 
-  function clearAll() { setGlobalSell(''); setGlobalBuy(''); setGlobalPack(''); setShowPackInput(false); setOverrides(initOverride()) }
+  function clearAll() {
+    setGlobalSell(''); setGlobalBuy(''); setGlobalPack('')
+    setShowPackInput(false); setOverrides(initOverride())
+  }
   function clearSellAll() {
     setGlobalSell('')
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],sellPrice:''}; return n })
+    setOverrides((prev) => {
+      const n = { ...prev }
+      for (const pf of PLATFORMS) n[pf] = { ...prev[pf], sellPrice: '' }
+      return n
+    })
   }
   function clearShipAll() {
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],service:'',shipping:'',shipAndPackCost:''}; return n })
+    setOverrides((prev) => {
+      const n = { ...prev }
+      for (const pf of PLATFORMS) n[pf] = { ...prev[pf], service: '', shipping: '', shipAndPackCost: '' }
+      return n
+    })
   }
   function clearPackAll() {
     setGlobalPack('')
-    setOverrides((prev) => { const n={...prev}; for(const pf of PLATFORMS) n[pf]={...prev[pf],packCost:'0',shipAndPackCost:''}; return n })
+    setOverrides((prev) => {
+      const n = { ...prev }
+      for (const pf of PLATFORMS) n[pf] = { ...prev[pf], packCost: '0', shipAndPackCost: '' }
+      return n
+    })
   }
 
   const [prevLoaded, setPrevLoaded] = useState(null)
@@ -252,6 +335,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
 
   return (
     <div className="w-full max-w-lg mx-auto flex flex-col gap-3">
+
       {loadedProduct && (
         <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 flex items-center justify-between gap-2">
           <div>
@@ -262,27 +346,47 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
         </div>
       )}
 
+      {/* 共通入力 */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">共通入力</p>
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-500 mb-1">販売価格（円）</label>
             <input type="text" inputMode="numeric" value={globalSell}
-              onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) handleGlobalSell(v===''?'':Number(v)) }}
-              placeholder="例：3,000"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right" />
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === '' || /^[0-9]+$/.test(v)) handleGlobalSell(v === '' ? '' : Number(v))
+              }}
+              placeholder="未入力→最低販売価格"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+            />
           </div>
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-500 mb-1">
-              仕入れ額（円）<span className="ml-1 text-[9px] text-gray-300 font-normal">未入力→最高仕入れ額</span>
+              仕入れ額（円）
             </label>
             <input type="text" inputMode="numeric" value={globalBuy}
-              onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) setGlobalBuy(v===''?'':Number(v)) }}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === '' || /^[0-9]+$/.test(v)) setGlobalBuy(v === '' ? '' : Number(v))
+              }}
               placeholder="未入力"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right" />
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+            />
           </div>
         </div>
 
+        {/* 入力状態ヒント */}
+        <p className="text-[9px] text-gray-300 mt-2 text-center">
+          {globalSell === '' && globalBuy !== ''
+            ? '💡 仕入れ額をもとに各プラットフォームの最低販売価格を表示中'
+            : globalSell === '' && globalBuy === ''
+            ? '販売価格または仕入れ額を入力してください'
+            : '各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます'
+          }
+        </p>
+
+        {/* 梱包材費一括入力 */}
         <div className="mt-3 border-t border-gray-100 pt-3">
           <button onClick={() => setShowPackInput((v) => !v)}
             className="w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">
@@ -292,38 +396,52 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
           {showPackInput && (
             <div className="mt-2 flex items-center gap-2">
               <input type="text" inputMode="numeric" value={globalPack}
-                onChange={(e) => { const v=e.target.value; if(v===''||/^[0-9]+$/.test(v)) setGlobalPack(v===''?'':Number(v)) }}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '' || /^[0-9]+$/.test(v)) setGlobalPack(v === '' ? '' : Number(v))
+                }}
                 placeholder="例：50" autoFocus
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-base font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right" />
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-base font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+              />
               <span className="text-sm text-gray-400 shrink-0">円</span>
-              <button onClick={() => {
-                if (globalPack === '') return
-                setOverrides((prev) => {
-                  const next = { ...prev }
-                  for (const pf of PLATFORMS) {
-                    const svcObj = shippingOptions[pf].find((s) => s.service === prev[pf].service)
-                    const isNonAnon = svcObj ? svcObj.anonymous === false : false
-                    next[pf] = isNonAnon
-                      ? { ...prev[pf], shipAndPackCost: String(globalPack) }
-                      : { ...prev[pf], packCost: String(globalPack) }
-                  }
-                  return next
-                })
-                setShowPackInput(false)
-              }} className="shrink-0 rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition">
+              <button
+                onClick={() => {
+                  if (globalPack === '') return
+                  setOverrides((prev) => {
+                    const next = { ...prev }
+                    for (const pf of PLATFORMS) {
+                      const svcObj = shippingOptions[pf].find((s) => s.service === prev[pf].service)
+                      const isNonAnon = svcObj ? svcObj.anonymous === false : false
+                      next[pf] = isNonAnon
+                        ? { ...prev[pf], shipAndPackCost: String(globalPack) }
+                        : { ...prev[pf], packCost: String(globalPack) }
+                    }
+                    return next
+                  })
+                  setShowPackInput(false)
+                }}
+                className="shrink-0 rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition"
+              >
                 一括適用
               </button>
             </div>
           )}
         </div>
-        <p className="text-[9px] text-gray-300 mt-2 text-center">各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます</p>
       </div>
 
+      {/* 4列 */}
       <div className="grid grid-cols-4 gap-1.5">
         {PLATFORMS.map((pf) => (
-          <PlatformColumn key={pf} platform={pf} buyPrice={globalBuy}
-            overrides={overrides} onOverride={handleOverride}
-            feeRates={feeRates} onFeeRatesChange={onFeeRatesChange} />
+          <PlatformColumn
+            key={pf}
+            platform={pf}
+            globalSell={globalSell}
+            buyPrice={globalBuy}
+            overrides={overrides}
+            onOverride={handleOverride}
+            feeRates={feeRates}
+            onFeeRatesChange={onFeeRatesChange}
+          />
         ))}
       </div>
 
@@ -332,6 +450,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
         この情報内容で商品管理に新規登録する →
       </button>
 
+      {/* クリアボタン群 */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">クリア</p>
         <div className="grid grid-cols-2 gap-2">
