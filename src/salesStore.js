@@ -126,3 +126,8 @@ export function platformRanking(sales) {
     .map(([platform, count]) => ({ platform, count }))
     .sort((a, b) => b.count - a.count)
 }
+
+// 商品IDごとの累計売上数を返す
+export function getSoldCountByProductId(productId) {
+  return getAllSales().filter((s) => s.productId === productId).length
+}

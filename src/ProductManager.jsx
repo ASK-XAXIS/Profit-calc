@@ -8,7 +8,7 @@ import {
 import { shippingOptions } from './constants'
 import SimulationModal from './SimulationModal'
 import SoldModal from './SoldModal'
-import { saveSale } from './salesStore'
+import { saveSale, getSoldCountByProductId } from './salesStore'
 import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig.jsx'
 
 const MAX_PRODUCTS  = 100
@@ -242,12 +242,13 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
     if (Object.keys(e).length > 0) { setErrors(e); return }
     const result = onSave({
       ...p,
-      stock:     Number(p.stock),
-      buyPrice:  Number(p.buyPrice),
-      sellPrice: p.sellPrice !== '' ? Number(p.sellPrice) : '',
-      thickness: p.thickness !== '' ? Number(p.thickness) : '',
-      packCost:  p.packCost  !== '' ? Number(p.packCost)  : '',
-      images:    p.images    || [],
+      stock:       Number(p.stock),
+      buyPrice:    Number(p.buyPrice),
+      sellPrice:   p.sellPrice   !== '' ? Number(p.sellPrice)   : '',
+      thickness:   p.thickness   !== '' ? Number(p.thickness)   : '',
+      packCost:    p.packCost    !== '' ? Number(p.packCost)    : '',
+      description: p.description || '',
+      images:      p.images      || [],
     })
     if (result && !result.success) setErrors({ global: result.message })
   }
@@ -390,6 +391,17 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
             <input type="text" inputMode="decimal" value={p.thickness} onChange={numericChange('thickness')} placeholder="例：2.5" className={ic} />
             <p className="text-xs text-gray-400 mt-1">シミュレーションの発送方法絞り込みに使用されます</p>
           </div>
+
+          <div>
+            <FieldLabel label="商品説明文" />
+            <textarea
+              value={p.description || ''}
+              onChange={(e) => set('description', e.target.value)}
+              placeholder="商品の状態、サイズ、特徴などを入力..."
+              rows={4}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none text-sm"
+            />
+          </div>
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
@@ -427,9 +439,224 @@ function StockBadge({ stock }) {
 }
 
 // ─────────────────────────────────────────
+// コピーボタン
+// ─────────────────────────────────────────
+function CopyButton({ text, className = '' }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition ${
+        copied
+          ? 'bg-emerald-100 text-emerald-600'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+      } ${className}`}
+    >
+      {copied ? (
+        <>
+          <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 8l3.5 3.5L13 4" />
+          </svg>
+          コピー済
+        </>
+      ) : (
+        <>
+          <svg viewBox="0 0 16 16" fill="none" className="w-3 h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <rect x="5" y="5" width="8" height="8" rx="1" />
+            <path d="M3 11V3h8" />
+          </svg>
+          コピー
+        </>
+      )}
+    </button>
+  )
+}
+
+// ─────────────────────────────────────────
+// 商品詳細ページ（全面表示）
+// ─────────────────────────────────────────
+function ProductDetailPage({ product, onEdit, onBack, onSold, onSimulate }) {
+  const [imageIdx, setImageIdx]     = useState(0)
+  const images   = product.images || []
+  const soldCount = getSoldCountByProductId(product.id)
+  const route    = product.selectedRoute || null
+  const isOutOfStock = Number(product.stock) <= 0
+
+  const PLATFORM_LABEL_LOCAL = {
+    mercari: 'メルカリ', yahoo: 'Yahoo!フリマ', rakuma: 'ラクマ', yahuoku: 'ヤフオク',
+  }
+
+  return (
+    <div className="w-full max-w-md mx-auto flex flex-col bg-gray-100 min-h-screen">
+
+      {/* トップバー */}
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm flex items-center gap-3 px-4 h-14">
+        <button onClick={onBack}
+          className="flex items-center gap-1 text-blue-500 hover:text-blue-700 transition text-sm font-semibold">
+          <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 4l-6 6 6 6" />
+          </svg>
+          戻る
+        </button>
+        <h2 className="flex-1 text-sm font-bold text-gray-800 truncate">{product.name}</h2>
+        <button onClick={onEdit}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition">
+          編集
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-6">
+
+        {/* 画像エリア */}
+        {images.length > 0 ? (
+          <div>
+            <div className="aspect-square bg-gray-200 overflow-hidden">
+              <img src={images[imageIdx]} alt="商品" className="w-full h-full object-contain bg-white" />
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-2 px-4 py-2 bg-white overflow-x-auto">
+                {images.map((src, i) => (
+                  <button key={i} onClick={() => setImageIdx(i)}
+                    className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition ${
+                      i === imageIdx ? 'border-blue-400' : 'border-transparent'
+                    }`}>
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="aspect-square bg-gray-100 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} className="w-16 h-16 text-gray-200">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 20.25h18" />
+            </svg>
+          </div>
+        )}
+
+        <div className="px-4 py-4 flex flex-col gap-4">
+
+          {/* 商品名 */}
+          <div className="bg-white rounded-2xl px-4 py-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-400 mb-1">商品名</p>
+                <p className="text-lg font-bold text-gray-800 leading-snug">{product.name}</p>
+              </div>
+              <CopyButton text={product.name} />
+            </div>
+
+            {/* 在庫 + 累計売上数 */}
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">在庫数</p>
+                {isOutOfStock
+                  ? <span className="rounded-full bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5">在庫なし</span>
+                  : <p className="text-sm font-bold text-gray-800">{product.stock}個</p>
+                }
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">累計売上数</p>
+                <p className="text-sm font-bold text-emerald-600">{soldCount}件</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 価格情報 */}
+          <div className="bg-white rounded-2xl px-4 py-4">
+            <p className="text-[10px] text-gray-400 mb-3">価格情報</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">仕入れ価格</p>
+                <p className="text-base font-black text-gray-800">
+                  ¥{product.buyPrice !== '' ? Number(product.buyPrice).toLocaleString() : '---'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">販売想定価格</p>
+                <p className="text-base font-black text-blue-600">
+                  {product.sellPrice !== '' ? `¥${Number(product.sellPrice).toLocaleString()}` : '未設定'}
+                </p>
+              </div>
+              {product.packCost !== '' && (
+                <div>
+                  <p className="text-[10px] text-gray-400 mb-0.5">梱包材費</p>
+                  <p className="text-sm font-semibold text-gray-600">¥{Number(product.packCost).toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 現在の販売ルート */}
+          {route && (
+            <div className="bg-white rounded-2xl px-4 py-4">
+              <p className="text-[10px] text-gray-400 mb-2">現在の販売ルート</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5">
+                  {PLATFORM_LABEL_LOCAL[route.platform] || route.platform}
+                </span>
+                <span className="rounded-full bg-gray-100 text-gray-600 text-xs px-2.5 py-0.5">{route.serviceLabel}</span>
+                <span className="rounded-full bg-gray-100 text-gray-600 text-xs px-2.5 py-0.5">{route.shippingLabel}</span>
+              </div>
+              <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                <span>送料 ¥{route.shippingFee}</span>
+                <span className={`font-bold ${route.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  利益 {route.profit >= 0 ? '+' : ''}¥{route.profit.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 商品説明文 */}
+          {product.description ? (
+            <div className="bg-white rounded-2xl px-4 py-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-gray-400">商品説明文</p>
+                <CopyButton text={product.description} />
+              </div>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{product.description}</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl px-4 py-3 flex items-center justify-between">
+              <p className="text-sm text-gray-300">商品説明文は未登録です</p>
+              <button onClick={onEdit}
+                className="text-xs text-blue-400 hover:text-blue-600 underline">追加する</button>
+            </div>
+          )}
+
+          {/* アクションボタン */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onSold(product)}
+              disabled={isOutOfStock}
+              className="flex-1 rounded-xl border border-emerald-300 bg-emerald-50 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1.5"
+            >
+              🎉 売れた！
+            </button>
+            <button
+              onClick={() => onSimulate(product)}
+              className="flex-1 rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition flex items-center justify-center gap-1.5"
+            >
+              📊 シミュレーション
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────
 // 商品カード — リスト表示
 // ─────────────────────────────────────────
-function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold }) {
+function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold, onDetail }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const route      = product.selectedRoute || null
   const routeBadge = route ? (PLATFORM_BADGE[route.platform] || '') : ''
@@ -438,13 +665,16 @@ function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold 
 
   return (
     <div className={`rounded-xl border bg-white shadow-sm p-3 flex gap-3 ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}>
-      <Thumbnail src={thumb} size="md" />
+      {/* サムネをタップで詳細へ */}
+      <button onClick={() => onDetail(product)} className="shrink-0">
+        <Thumbnail src={thumb} size="md" />
+      </button>
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-1">
-          <div className="min-w-0">
+          <button onClick={() => onDetail(product)} className="min-w-0 text-left flex-1">
             <p className="font-bold text-gray-800 text-sm truncate">{product.name}</p>
             <StockBadge stock={product.stock} />
-          </div>
+          </button>
           <div className="flex gap-1 shrink-0 flex-wrap justify-end">
             <button onClick={() => onLoadToCalc(product)} className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100 transition">計算機</button>
             <button onClick={onEdit} className="rounded border border-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50 transition">編集</button>
@@ -495,7 +725,7 @@ function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold 
 // ─────────────────────────────────────────
 // 商品カード — グリッド3列・サムネ付き
 // ─────────────────────────────────────────
-function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold }) {
+function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold, onDetail }) {
   const [showMenu, setShowMenu] = useState(false)
   const route = product.selectedRoute || null
   const thumb = product.images?.[0] || null
@@ -503,17 +733,18 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
 
   return (
     <div className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}>
-      <div className="relative aspect-square bg-gray-50">
+      <div className="relative aspect-square bg-gray-50 cursor-pointer" onClick={() => onDetail(product)}>
         <Thumbnail src={thumb} size="sm" />
         {isOutOfStock && (
           <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center rounded-t-xl">
             <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">在庫なし</span>
           </div>
         )}
-        <button onClick={() => setShowMenu((v) => !v)}
+        <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
           className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/30 text-white flex items-center justify-center text-xs hover:bg-black/50 transition">⋯</button>
         {showMenu && (
-          <div className="absolute top-7 right-1 z-10 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden min-w-[80px]">
+          <div className="absolute top-7 right-1 z-10 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden min-w-[80px]" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { onDetail(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">詳細</button>
             <button onClick={() => { onLoadToCalc(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50">計算機</button>
             <button onClick={() => { onEdit(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">編集</button>
             <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
@@ -522,7 +753,7 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
           </div>
         )}
       </div>
-      <div className="px-2 py-2 flex flex-col gap-1">
+      <button onClick={() => onDetail(product)} className="px-2 py-2 flex flex-col gap-1 text-left">
         <p className="font-semibold text-gray-800 text-xs leading-snug line-clamp-2">{product.name}</p>
         <StockBadge stock={product.stock} />
         <p className="text-[10px] text-gray-500">¥{Number(product.buyPrice).toLocaleString()}</p>
@@ -539,17 +770,21 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
 // ─────────────────────────────────────────
 // 商品カード — グリッド3列・サムネなし
 // ─────────────────────────────────────────
-function CardGrid3({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold }) {
+function CardGrid3({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold, onDetail }) {
   const [showMenu, setShowMenu] = useState(false)
   const route = product.selectedRoute || null
   const isOutOfStock = Number(product.stock) <= 0
 
   return (
-    <div className={`rounded-xl border bg-white shadow-sm px-2.5 py-2.5 flex flex-col gap-1.5 relative ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}>
-      <button onClick={() => setShowMenu((v) => !v)}
+    <div
+      className={`rounded-xl border bg-white shadow-sm px-2.5 py-2.5 flex flex-col gap-1.5 relative cursor-pointer ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}
+      onClick={() => onDetail(product)}
+    >
+      <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
         className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs hover:bg-gray-200 transition">⋯</button>
       {showMenu && (
-        <div className="absolute top-6 right-1 z-10 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden min-w-[80px]">
+        <div className="absolute top-6 right-1 z-10 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden min-w-[80px]" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => { onDetail(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">詳細</button>
           <button onClick={() => { onLoadToCalc(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50">計算機</button>
           <button onClick={() => { onEdit(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">編集</button>
           <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
@@ -578,7 +813,8 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
   const [showModal, setShowModal]                 = useState(false)
   const [editingProduct, setEditingProduct]       = useState(null)
   const [simulatingProduct, setSimulatingProduct] = useState(null)
-  const [soldProduct, setSoldProduct]             = useState(null)   // 「売れた！」対象商品
+  const [soldProduct, setSoldProduct]             = useState(null)
+  const [detailProduct, setDetailProduct]         = useState(null)  // 詳細表示中の商品
   const [search, setSearch]                       = useState('')
 
   useEffect(() => { setProducts(getAllProducts()) }, [])
@@ -624,11 +860,25 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
       onLoadToCalc: onLoadToCalc,
       onSimulate:   (prod) => setSimulatingProduct(prod),
       onSold:       (prod) => setSoldProduct(prod),
+      onDetail:     (prod) => setDetailProduct(prod),
     }
   }
 
   return (
     <div className="w-full max-w-md mx-auto">
+
+      {/* 商品詳細ページ（全面表示） */}
+      {detailProduct && (
+        <div className="fixed inset-0 z-40 bg-gray-100 overflow-y-auto">
+          <ProductDetailPage
+            product={detailProduct}
+            onBack={() => setDetailProduct(null)}
+            onEdit={() => { openEdit(detailProduct); setDetailProduct(null) }}
+            onSold={(prod) => { setSoldProduct(prod); setDetailProduct(null) }}
+            onSimulate={(prod) => { setSimulatingProduct(prod); setDetailProduct(null) }}
+          />
+        </div>
+      )}
 
       {products.length > 0 && (
         <div className="mb-3">
