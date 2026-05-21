@@ -234,6 +234,7 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
     if (!p.name.trim()) e.name = '商品名を入力してください'
     if (p.stock === '' || Number(p.stock) < 0) e.stock = '在庫数を0以上で入力してください'
     if (p.buyPrice === '' || isNaN(Number(p.buyPrice))) e.buyPrice = '仕入れ値を入力してください'
+    if ((p.description || '').length > 1000) e.description = '商品説明文は1000文字以内で入力してください'
     return e
   }
 
@@ -297,8 +298,33 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
 
           <div>
             <FieldLabel label="商品名" required />
-            <input type="text" value={p.name} onChange={(e) => set('name', e.target.value)} placeholder="例：ヴィンテージTシャツ" className={ic} />
-            {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            <input
+              type="text"
+              value={p.name}
+              onChange={(e) => set('name', e.target.value)}
+              placeholder="例：ヴィンテージTシャツ"
+              maxLength={65}
+              className={ic}
+            />
+            <div className="flex items-start justify-between mt-1 gap-2">
+              <div className="flex-1">
+                {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                {/* メルカリ・ラクマの40文字超え警告（邪魔しない形で表示） */}
+                {p.name.length > 40 && (p.platform === 'mercari' || p.platform === 'rakuma') && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <span>⚠</span>
+                    {p.platform === 'mercari' ? 'メルカリ' : 'ラクマ'}は40文字まで（現在{p.name.length}文字）
+                  </p>
+                )}
+                {p.name.length > 40 && !p.platform && (
+                  <p className="text-xs text-amber-500">メルカリ・ラクマは40文字まで</p>
+                )}
+              </div>
+              {/* 文字数カウント */}
+              <span className={`text-xs shrink-0 ${p.name.length >= 60 ? 'text-red-400 font-semibold' : p.name.length > 40 ? 'text-amber-500' : 'text-gray-300'}`}>
+                {p.name.length}/65
+              </span>
+            </div>
           </div>
           <div>
             <FieldLabel label="在庫数" required />
@@ -399,8 +425,29 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
               onChange={(e) => set('description', e.target.value)}
               placeholder="商品の状態、サイズ、特徴などを入力..."
               rows={4}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none text-sm"
+              className={`w-full border rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 resize-none text-sm ${
+                (p.description || '').length > 1000
+                  ? 'border-red-400 focus:ring-red-300'
+                  : 'border-gray-300 focus:ring-blue-400'
+              }`}
             />
+            <div className="flex items-start justify-between mt-1 gap-2">
+              <div className="flex-1">
+                {errors.description && (
+                  <p className="text-xs text-red-500">{errors.description}</p>
+                )}
+              </div>
+              {/* リアルタイム文字数カウント */}
+              <span className={`text-xs shrink-0 tabular-nums ${
+                (p.description || '').length > 1000
+                  ? 'text-red-500 font-bold'
+                  : (p.description || '').length > 900
+                  ? 'text-amber-500 font-semibold'
+                  : 'text-gray-300'
+              }`}>
+                {(p.description || '').length}/1000
+              </span>
+            </div>
           </div>
         </div>
 
