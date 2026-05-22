@@ -356,7 +356,7 @@ function SortableGrid({ order, onOrderChange, isEditMode, onNavigate }) {
 }
 
 // ── ホームページメイン ────────────────────────────────────
-export default function HomePage({ onNavigate }) {
+export default function HomePage({ onNavigate, onLegal }) {
   const [order, setOrder]         = useState(loadOrder)
   const [isEditMode, setEditMode] = useState(false)
 
@@ -375,7 +375,10 @@ export default function HomePage({ onNavigate }) {
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-gray-700">フリマ利益計算</h2>
+          <div className="flex items-baseline gap-1.5">
+            <h2 className="text-lg font-black text-blue-500 tracking-tight">Revofit</h2>
+            <span className="text-[10px] text-gray-400 font-normal">レヴォフィット</span>
+          </div>
           <p className="text-[10px] text-gray-400">
             {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -411,6 +414,30 @@ export default function HomePage({ onNavigate }) {
 
       {!isEditMode && (
         <p className="text-center text-[10px] text-gray-300">各カードをタップしてモードに移動</p>
+      )}
+
+      {/* 法的ページリンク */}
+      {!isEditMode && (
+        <div className="mt-2 border-t border-gray-200 pt-4 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <button
+            onClick={() => onLegal('privacy')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            プライバシーポリシー
+          </button>
+          <button
+            onClick={() => onLegal('terms')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            利用規約
+          </button>
+          <button
+            onClick={() => onLegal('commercial')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            特定商取引法に基づく表記
+          </button>
+        </div>
       )}
     </div>
   )
