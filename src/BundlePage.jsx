@@ -19,7 +19,7 @@ const PLATFORM_OPTIONS = Object.entries(PLATFORM_META).map(([k, v]) => ({ value:
 
 // ── 商品選択モーダル ──────────────────────────────────────
 function ProductSelectModal({ selected, onSelect, onClose }) {
-  const [products] = useState(() => getAllProducts())
+  const [products] = useState(() => getAllProducts().filter((p) => !p.isDraft))
   const [search, setSearch] = useState('')
 
   const filtered = products.filter((p) =>
@@ -221,21 +221,61 @@ function BundleSoldModal({ selected, bundlePlatform, soldDate, bundleSellPrice, 
   )
 }
 
+const BUNDLE_DRAFT_KEY = 'bundle_draft'
+
 // ── メインページ ──────────────────────────────────────────
 export default function BundlePage({ feeRates, onFeeRatesChange }) {
-  const [selected, setSelected]         = useState([])   // 選択商品
-  const [showSelect, setShowSelect]     = useState(false)
+  // 一時保存データを初期値として読み込む
+  const loadDraft = () => {
+    try {
+      const raw = localStorage.getItem(BUNDLE_DRAFT_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  }
+  const draft = loadDraft()
+
+  const [selected, setSelected]     = useState(() => {
+    // 下書きの selected は productId で商品を再取得して復元
+    if (!draft?.selectedIds) return []
+    const all = getAllProducts()
+    return draft.selectedIds.map((id) => all.find((p) => p.id === id)).filter(Boolean)
+  })
+  const [showSelect, setShowSelect] = useState(false)
+  const [isDraft, setIsDraft]       = useState(!!draft)  // 一時保存中かどうか
 
   // まとめ売り条件
-  const [platform,   setPlatform]   = useState('')
-  const [service,    setService]    = useState('')
-  const [shipping,   setShipping]   = useState('')
-  const [packCost,   setPackCost]   = useState('')
-  const [offerPrice, setOfferPrice] = useState('')  // 客の希望金額
+  const [platform,   setPlatform]   = useState(draft?.platform   || '')
+  const [service,    setService]    = useState(draft?.service     || '')
+  const [shipping,   setShipping]   = useState(draft?.shipping    || '')
+  const [packCost,   setPackCost]   = useState(draft?.packCost    || '')
+  const [offerPrice, setOfferPrice] = useState(draft?.offerPrice  || '')
 
   // 売れた！関連
-  const [soldDate,       setSoldDate]     = useState(() => new Date().toISOString().slice(0, 10))
-  const [showSoldModal,  setShowSoldModal] = useState(false)  // まとめ売り一括登録モーダル
+  const [soldDate,      setSoldDate]     = useState(() => new Date().toISOString().slice(0, 10))
+  const [showSoldModal, setShowSoldModal] = useState(false)
+
+  // 一時保存
+  function saveDraft() {
+    const data = {
+      selectedIds: selected.map((p) => p.id),
+      platform, service, shipping, packCost, offerPrice,
+    }
+    localStorage.setItem(BUNDLE_DRAFT_KEY, JSON.stringify(data))
+    setIsDraft(true)
+  }
+
+  // 一時保存を削除
+  function clearDraft() {
+    localStorage.removeItem(BUNDLE_DRAFT_KEY)
+    setIsDraft(false)
+  }
+
+  // 全クリア
+  function resetAll() {
+    setSelected([]); setPlatform(''); setService('')
+    setShipping(''); setPackCost(''); setOfferPrice('')
+    clearDraft()
+  }
 
   // プラットフォーム変更時リセット
   function handlePlatformChange(pf) {
@@ -295,13 +335,12 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
 
   // 売れた！保存
   function handleSoldSave(sale) {
-    // まとめ売りの売上を登録
     saveSale(sale)
-    // 各商品の在庫を1つずつ減らす
     for (const p of selected) {
       const newStock = Math.max((Number(p.stock) || 1) - 1, 0)
       saveProduct({ ...p, stock: newStock })
     }
+    clearDraft()
     setShowSoldModal(false)
   }
 
@@ -309,6 +348,23 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
 
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-4">
+
+      {/* 一時保存中バナー */}
+      {isDraft && (
+        <div className="rounded-xl bg-amber-50 border border-amber-300 px-4 py-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-500 text-sm">📝</span>
+            <div>
+              <p className="text-xs font-bold text-amber-700">一時保存中</p>
+              <p className="text-[10px] text-amber-600">このデータは損益集計・まとめ売り計算では使用されません</p>
+            </div>
+          </div>
+          <button onClick={resetAll}
+            className="shrink-0 rounded-lg border border-amber-300 px-2.5 py-1 text-[10px] font-semibold text-amber-600 hover:bg-amber-100 transition">
+            クリア
+          </button>
+        </div>
+      )}
 
       {/* ── 商品選択エリア ── */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
@@ -539,9 +595,24 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
             )}
           </div>
 
-          {/* ── 売れた！エリア ── */}
+          {/* ── 一時保存 & 売れた！エリア ── */}
           <div className="border-t border-gray-100 pt-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-500">売れた！登録</p>
+            <div className="flex gap-2">
+              <button
+                onClick={saveDraft}
+                className="flex-1 rounded-xl border border-amber-300 bg-amber-50 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition flex items-center justify-center gap-1.5"
+              >
+                📝 一時保存
+              </button>
+              <button
+                onClick={resetAll}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 transition"
+              >
+                クリア
+              </button>
+            </div>
+
+            <p className="text-xs font-semibold text-gray-500 pt-1">売れた！登録</p>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">売れた日付</label>
               <input type="date" value={soldDate} onChange={(e) => setSoldDate(e.target.value)} className={ic} />
