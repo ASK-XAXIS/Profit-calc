@@ -6,6 +6,7 @@ import ProductManager, { ViewModeToggle } from './ProductManager'
 import SummaryPage from './SummaryPage'
 import BundlePage from './BundlePage'
 import HomePage from './HomePage'
+import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
 
 // ─────────────────────────────────────────
 // タブ定義（中央がホーム）
@@ -534,7 +535,8 @@ function BottomNav({ activeTab, onTabChange }) {
 // App ルート
 // ─────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab]         = useState('home')   // 起動時はホーム
+  const [activeTab, setActiveTab]         = useState('home')
+  const [legalPage, setLegalPage]         = useState(null) // 'privacy' | 'terms' | 'commercial'
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
@@ -565,12 +567,26 @@ export default function App() {
     <div className="min-h-screen bg-gray-100">
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
-          <h1 className="text-base font-bold text-gray-800 mr-auto">
-            {activeTab === 'home'     && 'ホーム'}
-            {activeTab === 'products' && '商品管理'}
-            {activeTab === 'calc'     && '利益計算機'}
-            {activeTab === 'summary'  && '損益集計'}
-            {activeTab === 'bundle'   && 'まとめ売り計算'}
+          <h1 className="text-base font-bold text-gray-800 mr-auto flex items-center gap-2">
+            {legalPage ? (
+              <>
+                {legalPage === 'privacy'    && 'プライバシーポリシー'}
+                {legalPage === 'terms'      && '利用規約'}
+                {legalPage === 'commercial' && '特定商取引法に基づく表記'}
+              </>
+            ) : activeTab === 'home' ? (
+              <span className="flex items-center gap-1.5">
+                <span className="text-blue-500 font-black tracking-tight">Revofit</span>
+                <span className="text-[10px] font-normal text-gray-400">レヴォフィット</span>
+              </span>
+            ) : (
+              <>
+                {activeTab === 'products' && '商品管理'}
+                {activeTab === 'calc'     && '利益計算機'}
+                {activeTab === 'summary'  && '損益集計'}
+                {activeTab === 'bundle'   && 'まとめ売り計算'}
+              </>
+            )}
           </h1>
           {activeTab === 'products' && (
             <ViewModeToggle viewMode={viewMode} onChange={handleViewModeChange} />
@@ -593,34 +609,42 @@ export default function App() {
       </header>
 
       <main className="pb-32 pt-4 px-3">
-        <div className={activeTab === 'home' ? 'block' : 'hidden'}>
-          <HomePage onNavigate={setActiveTab} />
-        </div>
-        <div className={activeTab === 'products' ? 'block' : 'hidden'}>
-          <ProductManager
-            calcState={calcState}
-            onLoadToCalc={handleLoadToCalc}
-            addBtnId="product-manager-add-btn"
-            viewMode={viewMode}
-            onViewModeChange={handleViewModeChange}
-            feeRates={feeRates}
-            onFeeRatesChange={handleFeeRatesChange}
-          />
-        </div>
-        <div className={activeTab === 'calc' ? 'block' : 'hidden'}>
-          <CalcPage
-            loadedProduct={loadedProduct}
-            setLoadedProduct={setLoadedProduct}
-            onSwitchToProducts={handleSwitchToProducts}
-            feeRates={feeRates}
-            onFeeRatesChange={handleFeeRatesChange}
-          />
-        </div>
-        <div className={activeTab === 'summary' ? 'block' : 'hidden'}>
-          <SummaryPage feeRates={feeRates} onFeeRatesChange={handleFeeRatesChange} />
-        </div>
-        <div className={activeTab === 'bundle' ? 'block' : 'hidden'}>
-          <BundlePage feeRates={feeRates} onFeeRatesChange={handleFeeRatesChange} />
+        {/* 法的ページ（表示中はタブコンテンツを隠す） */}
+        {legalPage === 'privacy'    && <PrivacyPolicy       onBack={() => setLegalPage(null)} />}
+        {legalPage === 'terms'      && <TermsOfService      onBack={() => setLegalPage(null)} />}
+        {legalPage === 'commercial' && <CommercialDisclosure onBack={() => setLegalPage(null)} />}
+
+        {/* 通常タブ（法的ページ非表示時のみ） */}
+        <div className={legalPage ? 'hidden' : ''}>
+          <div className={activeTab === 'home' ? 'block' : 'hidden'}>
+            <HomePage onNavigate={setActiveTab} onLegal={setLegalPage} />
+          </div>
+          <div className={activeTab === 'products' ? 'block' : 'hidden'}>
+            <ProductManager
+              calcState={calcState}
+              onLoadToCalc={handleLoadToCalc}
+              addBtnId="product-manager-add-btn"
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+              feeRates={feeRates}
+              onFeeRatesChange={handleFeeRatesChange}
+            />
+          </div>
+          <div className={activeTab === 'calc' ? 'block' : 'hidden'}>
+            <CalcPage
+              loadedProduct={loadedProduct}
+              setLoadedProduct={setLoadedProduct}
+              onSwitchToProducts={handleSwitchToProducts}
+              feeRates={feeRates}
+              onFeeRatesChange={handleFeeRatesChange}
+            />
+          </div>
+          <div className={activeTab === 'summary' ? 'block' : 'hidden'}>
+            <SummaryPage feeRates={feeRates} onFeeRatesChange={handleFeeRatesChange} />
+          </div>
+          <div className={activeTab === 'bundle' ? 'block' : 'hidden'}>
+            <BundlePage feeRates={feeRates} onFeeRatesChange={handleFeeRatesChange} />
+          </div>
         </div>
       </main>
 
