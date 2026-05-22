@@ -1,20 +1,21 @@
 import { useState, useCallback, useMemo } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
-import { calcFee, calcProfit, calcBreakEven } from './calc'
+import { calcFee, calcProfit } from './calc'
 import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig.jsx'
 import ProductManager, { ViewModeToggle } from './ProductManager'
 import SummaryPage from './SummaryPage'
 import BundlePage from './BundlePage'
+import HomePage from './HomePage'
 
 // ─────────────────────────────────────────
-// タブ定義
+// タブ定義（中央がホーム）
 // ─────────────────────────────────────────
 const TABS = [
   {
     id: 'products',
     label: '商品管理',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h12A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6z" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9h7.5M8.25 12h7.5M8.25 15h4.5" />
       </svg>
@@ -24,16 +25,30 @@ const TABS = [
     id: 'bundle',
     label: 'まとめ売り',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
       </svg>
+    ),
+  },
+  {
+    id: 'home',
+    label: 'ホーム',
+    icon: (active) => (
+      <div className={[
+        'w-10 h-10 rounded-full flex items-center justify-center -mt-5 shadow-lg border-4 border-white transition-all',
+        active ? 'bg-blue-500' : 'bg-gray-400',
+      ].join(' ')}>
+        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      </div>
     ),
   },
   {
     id: 'calc',
     label: '計算機',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
         <rect x="4" y="3" width="16" height="18" rx="2" />
         <path strokeLinecap="round" d="M8 7h8M8 11h3M8 15h3M15 11h1M15 15h1" />
       </svg>
@@ -43,7 +58,7 @@ const TABS = [
     id: 'summary',
     label: '損益集計',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
+      <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth={active ? 2.5 : 1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5l5-5 4 4 5-6" />
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 20.25h18" />
         <circle cx="8" cy="8.5" r="1" fill="currentColor" stroke="none" />
@@ -481,16 +496,33 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
 function BottomNav({ activeTab, onTabChange }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
-      <div className="flex max-w-lg mx-auto">
+      <div className="flex max-w-lg mx-auto items-end">
         {TABS.map((tab) => {
           const active = activeTab === tab.id
+          const isHome = tab.id === 'home'
           return (
-            <button key={tab.id} onClick={() => onTabChange(tab.id)}
-              className={['flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors relative',
-                active ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'].join(' ')}>
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={[
+                'flex-1 flex flex-col items-center justify-end transition-colors relative',
+                isHome ? 'pb-1' : 'py-2',
+                !isHome && (active ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'),
+              ].join(' ')}
+            >
               {tab.icon(active)}
-              <span className={`text-[10px] font-medium ${active ? 'text-blue-500' : 'text-gray-400'}`}>{tab.label}</span>
-              {active && <span className="absolute bottom-0 w-8 h-0.5 bg-blue-500 rounded-full" />}
+              <span className={[
+                'font-medium',
+                isHome ? 'text-[9px] mt-0.5' : 'text-[9px] mt-0.5',
+                isHome
+                  ? active ? 'text-blue-500' : 'text-gray-400'
+                  : active ? 'text-blue-500' : 'text-gray-400',
+              ].join(' ')}>
+                {tab.label}
+              </span>
+              {!isHome && active && (
+                <span className="absolute bottom-0 w-6 h-0.5 bg-blue-500 rounded-full" />
+              )}
             </button>
           )
         })}
@@ -503,7 +535,7 @@ function BottomNav({ activeTab, onTabChange }) {
 // App ルート
 // ─────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab]         = useState('products')
+  const [activeTab, setActiveTab]         = useState('home')   // 起動時はホーム
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
@@ -535,6 +567,7 @@ export default function App() {
       <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
           <h1 className="text-base font-bold text-gray-800 mr-auto">
+            {activeTab === 'home'     && 'ホーム'}
             {activeTab === 'products' && '商品管理'}
             {activeTab === 'calc'     && '利益計算機'}
             {activeTab === 'summary'  && '損益集計'}
@@ -561,6 +594,9 @@ export default function App() {
       </header>
 
       <main className="pb-24 pt-4 px-3">
+        <div className={activeTab === 'home' ? 'block' : 'hidden'}>
+          <HomePage onNavigate={setActiveTab} />
+        </div>
         <div className={activeTab === 'products' ? 'block' : 'hidden'}>
           <ProductManager
             calcState={calcState}
