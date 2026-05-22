@@ -369,6 +369,230 @@ function NewSaleModal({ onSave, onClose, feeRates, onFeeRatesChange }) {
   )
 }
 
+// ── CSV出力ユーティリティ ─────────────────────────────────
+const PLATFORM_LABEL_CSV = {
+  mercari: 'メルカリ',
+  yahoo:   'Yahoo!フリマ',
+  rakuma:  'ラクマ',
+  yahuoku: 'ヤフオク',
+}
+
+function escCsv(val) {
+  const s = String(val ?? '')
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? `"${s.replace(/"/g, '""')}"`
+    : s
+}
+
+function buildCsv(sales, targetMonth) {
+  const filtered = sales
+    .filter((s) => s.soldDate && s.soldDate.startsWith(targetMonth))
+    .sort((a, b) => a.soldDate.localeCompare(b.soldDate))
+
+  if (filtered.length === 0) return null
+
+  // ── ヘッダー行 ──────────────────────────────────────────
+  // 収支内訳書・簿記の補助明細に転用できるフォーマット
+  const headers = [
+    '取引日',
+    '勘定科目',
+    '取引区分',
+    '摘要（商品名）',
+    '販売プラットフォーム',
+    '売上金額（円）',
+    '仕入原価（円）',
+    '販売手数料（円）',
+    '発送送料（円）',
+    '梱包材費（円）',
+    '経費合計（円）',
+    '差引利益（円）',
+    '備考',
+  ]
+
+  const rows = filtered.map((s) => {
+    const sellPrice   = Number(s.sellPrice)   || 0
+    const buyPrice    = Number(s.buyPrice)    || 0
+    const fee         = Number(s.fee)         || 0
+    const shippingFee = Number(s.shippingFee) || 0
+    const packCost    = Number(s.packCost)    || 0
+    const costTotal   = buyPrice + fee + shippingFee + packCost
+    const profit      = sellPrice - costTotal
+    const platform    = PLATFORM_LABEL_CSV[s.platform] || s.platform || '不明'
+    const isBundle    = s.isBundle ? 'まとめ売り' : '通常'
+
+    return [
+      s.soldDate,
+      '売上高',          // 勘定科目
+      isBundle,
+      s.productName || '',
+      platform,
+      sellPrice,
+      buyPrice,
+      fee,
+      shippingFee,
+      packCost,
+      costTotal,
+      profit,
+      s.isBundle ? `${s.bundleCount || ''}商品のまとめ売り` : '',
+    ].map(escCsv).join(',')
+  })
+
+  // ── 合計行 ──────────────────────────────────────────────
+  const totSell    = filtered.reduce((s, r) => s + (Number(r.sellPrice)   || 0), 0)
+  const totBuy     = filtered.reduce((s, r) => s + (Number(r.buyPrice)    || 0), 0)
+  const totFee     = filtered.reduce((s, r) => s + (Number(r.fee)         || 0), 0)
+  const totShip    = filtered.reduce((s, r) => s + (Number(r.shippingFee) || 0), 0)
+  const totPack    = filtered.reduce((s, r) => s + (Number(r.packCost)    || 0), 0)
+  const totCost    = totBuy + totFee + totShip + totPack
+  const totProfit  = totSell - totCost
+
+  const summaryRow = [
+    `${targetMonth} 月次合計`,
+    '',
+    '',
+    `${filtered.length}件`,
+    '',
+    totSell,
+    totBuy,
+    totFee,
+    totShip,
+    totPack,
+    totCost,
+    totProfit,
+    '',
+  ].map(escCsv).join(',')
+
+  // ── BOM付きUTF-8（Excelで開いても文字化けしない） ────────
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows, '', summaryRow].join('\r\n')
+  return { csvContent, count: filtered.length }
+}
+
+function downloadCsv(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── CSV出力モーダル ───────────────────────────────────────
+function CsvExportModal({ sales, onClose }) {
+  const [targetMonth, setTargetMonth] = useState(() => new Date().toISOString().slice(0, 7))
+
+  // 選択中の月のデータ件数プレビュー
+  const previewCount = sales.filter((s) => s.soldDate?.startsWith(targetMonth)).length
+
+  // 選択可能な月一覧（売上データに含まれる月）
+  const availableMonths = useMemo(() => {
+    const set = new Set(sales.map((s) => s.soldDate?.slice(0, 7)).filter(Boolean))
+    return [...set].sort((a, b) => b.localeCompare(a))
+  }, [sales])
+
+  function handleExport() {
+    const result = buildCsv(sales, targetMonth)
+    if (!result) return
+    const [year, month] = targetMonth.split('-')
+    const filename = `売上明細_${year}年${month}月.csv`
+    downloadCsv(result.csvContent, filename)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+        <div className="bg-blue-600 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-white font-bold">CSV出力</h2>
+            <p className="text-blue-100 text-xs mt-0.5">確定申告・簿記向けフォーマット</p>
+          </div>
+          <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+
+          {/* 対象月選択 */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">出力対象月</label>
+            <input
+              type="month"
+              value={targetMonth}
+              onChange={(e) => setTargetMonth(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-base"
+            />
+            {/* 既存データの月をクイック選択 */}
+            {availableMonths.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {availableMonths.slice(0, 6).map((m) => (
+                  <button key={m} onClick={() => setTargetMonth(m)}
+                    className={[
+                      'rounded-lg px-2.5 py-1 text-xs font-semibold border transition',
+                      targetMonth === m
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100',
+                    ].join(' ')}>
+                    {m.replace('-', '年')}月
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* プレビュー */}
+          <div className={`rounded-xl px-4 py-3 ${previewCount > 0 ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'}`}>
+            <p className="text-sm font-semibold text-gray-700">
+              {targetMonth.replace('-', '年')}月のデータ
+            </p>
+            <p className={`text-2xl font-black mt-1 ${previewCount > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
+              {previewCount}<span className="text-sm font-normal ml-1">件</span>
+            </p>
+            {previewCount > 0 && (
+              <p className="text-xs text-blue-500 mt-1">この件数のデータがCSVに出力されます</p>
+            )}
+          </div>
+
+          {/* 出力内容の説明 */}
+          <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 space-y-1">
+            <p className="text-xs font-semibold text-gray-600 mb-2">出力項目</p>
+            {[
+              '取引日 / 勘定科目（売上高）/ 取引区分',
+              '摘要（商品名）/ 販売プラットフォーム',
+              '売上金額 / 仕入原価 / 販売手数料',
+              '発送送料 / 梱包材費 / 経費合計',
+              '差引利益 / 月次合計行',
+            ].map((item, i) => (
+              <p key={i} className="text-[11px] text-gray-500 flex items-start gap-1">
+                <span className="text-blue-400 shrink-0 mt-0.5">✓</span>{item}
+              </p>
+            ))}
+            <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-200">
+              ※ BOM付きUTF-8形式。ExcelでそのままCSVを開いても文字化けしません。
+            </p>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition">
+            キャンセル
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={previewCount === 0}
+            className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            CSVをダウンロード
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── メインページ ──────────────────────────────────────────
 export default function SummaryPage({ feeRates, onFeeRatesChange }) {
   const [sales, setSales]           = useState([])
@@ -377,6 +601,7 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
   const [showDetail, setShowDetail] = useState(false)
   const [editingSale, setEditingSale]     = useState(null)
   const [showNewSale, setShowNewSale]     = useState(false)
+  const [showCsvModal, setShowCsvModal]   = useState(false)   // CSV出力
   const [selectedGroup, setSelectedGroup] = useState(null)
 
   // 初回ロード
@@ -448,10 +673,22 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
                 period === v ? 'bg-white text-blue-500 shadow-sm' : 'text-gray-400'].join(' ')}>{l}</button>
           ))}
         </div>
-        <button onClick={() => setShowNewSale(true)}
-          className="ml-auto flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition">
-          ＋ 売上登録
-        </button>
+        <div className="ml-auto flex gap-2">
+          {/* CSV出力ボタン */}
+          <button
+            onClick={() => setShowCsvModal(true)}
+            className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+              <path fillRule="evenodd" d="M2 13a1 1 0 001 1h10a1 1 0 000-2H3a1 1 0 00-1 1zm3-5.707a1 1 0 011.414 0L7 8.586V3a1 1 0 112 0v5.586l.586-.586a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            CSV
+          </button>
+          <button onClick={() => setShowNewSale(true)}
+            className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition">
+            ＋ 売上登録
+          </button>
+        </div>
       </div>
 
       {sales.length === 0 ? (
@@ -641,6 +878,13 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
           onClose={() => setShowNewSale(false)}
           feeRates={feeRates}
           onFeeRatesChange={onFeeRatesChange}
+        />
+      )}
+
+      {showCsvModal && (
+        <CsvExportModal
+          sales={sales}
+          onClose={() => setShowCsvModal(false)}
         />
       )}
     </div>
