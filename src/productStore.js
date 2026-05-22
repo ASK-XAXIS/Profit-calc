@@ -10,6 +10,11 @@ export function getAllProducts() {
   }
 }
 
+// 下書き以外の商品（他モードで使用する商品リスト）
+export function getAllActiveProducts() {
+  return getAllProducts().filter((p) => !p.isDraft)
+}
+
 export function saveProduct(product) {
   const products = getAllProducts()
   const idx = products.findIndex((p) => p.id === product.id)
@@ -45,7 +50,7 @@ export function createEmptyProduct() {
     stock: '',
     buyPrice: '',
     sellPrice: '',
-    description: '',   // 商品説明文
+    description: '',
     registeredDate: '',
     soldDate: '',
     thickness: '',
@@ -53,6 +58,7 @@ export function createEmptyProduct() {
     service: '',
     shipping: '',
     packCost: '',
+    isDraft: false,   // 一時保存フラグ
     createdAt: null,
     updatedAt: null,
   }
