@@ -10,6 +10,7 @@ import SimulationModal from './SimulationModal'
 import SoldModal from './SoldModal'
 import { saveSale, getSoldCountByProductId } from './salesStore'
 import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig.jsx'
+import { getAllHistory, pushHistory, deleteHistory } from './productHistoryStore'
 
 const MAX_PRODUCTS  = 100
 const MAX_IMAGES    = 10
@@ -211,9 +212,11 @@ function FieldLabel({ label, required }) {
   )
 }
 
-function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRates, onFeeRatesChange }) {
+function ProductFormModal({ product: initial, onSave, onSaveDraft, onClose, calcState, feeRates, onFeeRatesChange }) {
   const [p, setP] = useState(initial)
   const [errors, setErrors] = useState({})
+  const [showHistory, setShowHistory] = useState(false)
+  const [history] = useState(() => getAllHistory())
 
   const currentServices = p.platform ? shippingOptions[p.platform] || [] : []
   const selectedService  = currentServices.find((s) => s.service === p.service) || null
@@ -250,8 +253,42 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
       packCost:    p.packCost    !== '' ? Number(p.packCost)    : '',
       description: p.description || '',
       images:      p.images      || [],
+      isDraft:     false,
     })
     if (result && !result.success) setErrors({ global: result.message })
+  }
+
+  // 一時保存（バリデーションなし）
+  function handleSaveDraft() {
+    onSaveDraft({
+      ...p,
+      stock:       p.stock      !== '' ? Number(p.stock)      : '',
+      buyPrice:    p.buyPrice   !== '' ? Number(p.buyPrice)   : '',
+      sellPrice:   p.sellPrice  !== '' ? Number(p.sellPrice)  : '',
+      thickness:   p.thickness  !== '' ? Number(p.thickness)  : '',
+      packCost:    p.packCost   !== '' ? Number(p.packCost)   : '',
+      description: p.description || '',
+      images:      p.images      || [],
+      isDraft:     true,
+    })
+  }
+
+  // 履歴から適用
+  function applyHistory(entry) {
+    setP((prev) => ({
+      ...prev,
+      name:        entry.name        || prev.name,
+      buyPrice:    entry.buyPrice    !== '' ? String(entry.buyPrice)   : prev.buyPrice,
+      sellPrice:   entry.sellPrice   !== '' ? String(entry.sellPrice)  : prev.sellPrice,
+      description: entry.description || prev.description,
+      thickness:   entry.thickness   !== '' ? String(entry.thickness)  : prev.thickness,
+      platform:    entry.platform    || prev.platform,
+      service:     entry.service     || prev.service,
+      shipping:    entry.shipping    || prev.shipping,
+      packCost:    entry.packCost    !== '' ? String(entry.packCost)   : prev.packCost,
+      images:      entry.images?.length ? entry.images : prev.images,
+    }))
+    setShowHistory(false)
   }
 
   function applyCalcState() {
@@ -278,8 +315,27 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="bg-blue-500 px-6 py-4 flex items-center justify-between">
           <h2 className="text-white font-bold text-lg">{isEdit ? '商品を編集' : '商品を追加'}</h2>
-          <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
+          <div className="flex items-center gap-2">
+            {/* 履歴ボタン（新規追加時のみ） */}
+            {!isEdit && history.length > 0 && (
+              <button
+                onClick={() => setShowHistory(true)}
+                className="rounded-lg bg-white/20 hover:bg-white/30 px-2.5 py-1 text-xs font-semibold text-white transition"
+              >
+                📋 履歴
+              </button>
+            )}
+            <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
+          </div>
         </div>
+
+        {/* 一時保存中バナー */}
+        {initial.isDraft && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2">
+            <span className="text-amber-500 text-sm">📝</span>
+            <p className="text-xs font-semibold text-amber-700">一時保存中のデータを編集しています</p>
+          </div>
+        )}
 
         {!isEdit && hasCalcData && (
           <div className="bg-blue-50 border-b border-blue-100 px-6 py-3 flex items-center justify-between gap-3">
@@ -290,6 +346,46 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
 
         <div className="px-6 py-5 max-h-[68vh] overflow-y-auto space-y-4">
           {errors.global && <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{errors.global}</p>}
+
+        {/* 履歴選択モーダル（インライン） */}
+        {showHistory && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+              <div className="bg-gray-700 px-5 py-4 flex items-center justify-between">
+                <h3 className="text-white font-bold text-sm">登録履歴から選択</h3>
+                <button onClick={() => setShowHistory(false)} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
+              </div>
+              <div className="overflow-y-auto divide-y divide-gray-50" style={{ maxHeight: '55vh' }}>
+                {history.length === 0 ? (
+                  <p className="text-center text-sm text-gray-400 py-8">履歴がありません</p>
+                ) : history.map((entry) => (
+                  <button key={entry.id} onClick={() => applyHistory(entry)}
+                    className="w-full flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition text-left">
+                    {entry.images?.[0]
+                      ? <img src={entry.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 mt-0.5" />
+                      : <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 mt-0.5" />
+                    }
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.name}</p>
+                      <p className="text-xs text-gray-400">
+                        仕入れ ¥{Number(entry.buyPrice).toLocaleString()}
+                        {entry.sellPrice !== '' && ` / 売値 ¥${Number(entry.sellPrice).toLocaleString()}`}
+                      </p>
+                      <p className="text-[10px] text-gray-300">{entry.savedAt?.slice(0, 10)}</p>
+                    </div>
+                    <span className="text-xs text-blue-500 font-semibold shrink-0 mt-1">適用</span>
+                  </button>
+                ))}
+              </div>
+              <div className="px-5 py-3 border-t border-gray-100">
+                <button onClick={() => setShowHistory(false)}
+                  className="w-full rounded-xl border border-gray-200 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition">
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
           <ImageUploader images={p.images || []} onChange={(imgs) => set('images', imgs)} />
           <div className="border-t border-gray-100" />
@@ -451,7 +547,14 @@ function ProductFormModal({ product: initial, onSave, onClose, calcState, feeRat
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center gap-2">
+          <button
+            onClick={handleSaveDraft}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition"
+          >
+            一時保存
+          </button>
+          <div className="flex-1" />
           <button onClick={onClose} className="rounded-lg px-5 py-2 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition">キャンセル</button>
           <button onClick={handleSave} className="rounded-lg px-5 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 transition">保存する</button>
         </div>
@@ -758,7 +861,7 @@ function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold,
   const isOutOfStock = Number(product.stock) <= 0
 
   return (
-    <div className={`rounded-xl border bg-white shadow-sm p-3 flex gap-3 ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}>
+    <div className={`rounded-xl border bg-white shadow-sm p-3 flex gap-3 ${isOutOfStock ? 'border-red-100 opacity-75' : product.isDraft ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200'}`}>
       {/* サムネをタップで詳細へ */}
       <button onClick={() => onDetail(product)} className="shrink-0">
         <Thumbnail src={thumb} size="md" />
@@ -766,7 +869,12 @@ function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold,
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-1">
           <button onClick={() => onDetail(product)} className="min-w-0 text-left flex-1">
-            <p className="font-bold text-gray-800 text-sm truncate">{product.name}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-bold text-gray-800 text-sm truncate">{product.name || '（名称未設定）'}</p>
+              {product.isDraft && (
+                <span className="rounded-full bg-amber-200 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 shrink-0">📝 下書き</span>
+              )}
+            </div>
             <StockBadge stock={product.stock} />
           </button>
           <div className="flex gap-1 shrink-0 flex-wrap justify-end">
@@ -802,7 +910,7 @@ function CardList({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold,
           {/* 売れた！ボタン */}
           <button
             onClick={() => onSold(product)}
-            disabled={isOutOfStock}
+            disabled={isOutOfStock || !!product.isDraft}
             className="flex-1 rounded border border-emerald-300 bg-emerald-50 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1"
           >
             🎉 売れた！
@@ -824,12 +932,18 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
   const route = product.selectedRoute || null
   const thumb = product.images?.[0] || null
   const isOutOfStock = Number(product.stock) <= 0
+  const isDraft = !!product.isDraft
 
   return (
-    <div className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}>
+    <div className={`rounded-xl border bg-white shadow-sm overflow-hidden flex flex-col ${isOutOfStock ? 'border-red-100 opacity-75' : isDraft ? 'border-amber-300' : 'border-gray-200'}`}>
       <div className="relative aspect-square bg-gray-50 cursor-pointer" onClick={() => onDetail(product)}>
         <Thumbnail src={thumb} size="sm" />
-        {isOutOfStock && (
+        {isDraft && (
+          <div className="absolute top-1 left-1">
+            <span className="rounded-full bg-amber-400 text-white text-[9px] font-bold px-1.5 py-0.5">📝 下書き</span>
+          </div>
+        )}
+        {isOutOfStock && !isDraft && (
           <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center rounded-t-xl">
             <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">在庫なし</span>
           </div>
@@ -841,17 +955,17 @@ function CardGrid3Thumb({ product, onEdit, onDelete, onLoadToCalc, onSimulate, o
             <button onClick={() => { onDetail(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">詳細</button>
             <button onClick={() => { onLoadToCalc(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50">計算機</button>
             <button onClick={() => { onEdit(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">編集</button>
-            <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
+            <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock || isDraft} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
             <button onClick={() => { onSimulate(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-50">シミュレーション</button>
             <button onClick={() => { onDelete(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 border-t border-gray-100">削除</button>
           </div>
         )}
       </div>
       <button onClick={() => onDetail(product)} className="px-2 py-2 flex flex-col gap-1 text-left w-full">
-        <p className="font-semibold text-gray-800 text-xs leading-snug line-clamp-2">{product.name}</p>
+        <p className="font-semibold text-gray-800 text-xs leading-snug line-clamp-2">{product.name || '（名称未設定）'}</p>
         <StockBadge stock={product.stock} />
         <p className="text-[10px] text-gray-500">¥{Number(product.buyPrice).toLocaleString()}</p>
-        {route && (
+        {route && !isDraft && (
           <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold border ${PLATFORM_BADGE[route.platform] || 'bg-gray-100 text-gray-600 border-gray-200'} truncate`}>
             {PLATFORM_LABEL[route.platform] || route.platform} {route.profit >= 0 ? '+' : ''}{route.profit.toLocaleString()}円
           </span>
@@ -868,10 +982,11 @@ function CardGrid3({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold
   const [showMenu, setShowMenu] = useState(false)
   const route = product.selectedRoute || null
   const isOutOfStock = Number(product.stock) <= 0
+  const isDraft = !!product.isDraft
 
   return (
     <div
-      className={`rounded-xl border bg-white shadow-sm px-2.5 py-2.5 flex flex-col gap-1.5 relative cursor-pointer ${isOutOfStock ? 'border-red-100 opacity-75' : 'border-gray-200'}`}
+      className={`rounded-xl border bg-white shadow-sm px-2.5 py-2.5 flex flex-col gap-1.5 relative cursor-pointer ${isOutOfStock ? 'border-red-100 opacity-75' : isDraft ? 'border-amber-300 bg-amber-50/20' : 'border-gray-200'}`}
       onClick={() => onDetail(product)}
     >
       <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }}
@@ -881,16 +996,19 @@ function CardGrid3({ product, onEdit, onDelete, onLoadToCalc, onSimulate, onSold
           <button onClick={() => { onDetail(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">詳細</button>
           <button onClick={() => { onLoadToCalc(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50">計算機</button>
           <button onClick={() => { onEdit(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">編集</button>
-          <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
+          <button onClick={() => { onSold(product); setShowMenu(false) }} disabled={isOutOfStock || isDraft} className="block w-full text-left px-3 py-1.5 text-xs text-emerald-600 hover:bg-emerald-50 disabled:opacity-40">売れた！</button>
           <button onClick={() => { onSimulate(product); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-50">シミュレーション</button>
           <button onClick={() => { onDelete(); setShowMenu(false) }} className="block w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 border-t border-gray-100">削除</button>
         </div>
       )}
-      <p className="font-semibold text-gray-800 text-xs leading-snug pr-5 line-clamp-2">{product.name}</p>
+      <div className="flex items-start gap-1 pr-5">
+        <p className="font-semibold text-gray-800 text-xs leading-snug line-clamp-2 flex-1">{product.name || '（名称未設定）'}</p>
+        {isDraft && <span className="text-[8px] font-bold text-amber-600 bg-amber-100 rounded px-1 py-0.5 shrink-0 leading-tight">下書き</span>}
+      </div>
       <StockBadge stock={product.stock} />
       <p className="text-[10px] text-gray-700 font-medium">¥{Number(product.buyPrice).toLocaleString()}</p>
       {product.sellPrice !== '' && <p className="text-[10px] text-blue-500">売値 ¥{Number(product.sellPrice).toLocaleString()}</p>}
-      {route && (
+      {route && !isDraft && (
         <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold border ${PLATFORM_BADGE[route.platform] || 'bg-gray-100 text-gray-600 border-gray-200'} truncate`}>
           {PLATFORM_LABEL[route.platform] || route.platform} {route.profit >= 0 ? '+' : ''}{route.profit.toLocaleString()}円
         </span>
@@ -927,8 +1045,19 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
 
   function handleSave(product) {
     const result = saveProduct(product)
-    if (result.success) { refresh(); setShowModal(false) }
+    if (result.success) {
+      // 下書きでない場合のみ履歴に追加
+      if (!product.isDraft) pushHistory(product)
+      refresh()
+      setShowModal(false)
+    }
     return result
+  }
+
+  function handleSaveDraft(product) {
+    saveProduct(product)
+    refresh()
+    setShowModal(false)
   }
 
   function handleDelete(id) { deleteProduct(id); refresh() }
@@ -1022,6 +1151,7 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
         <ProductFormModal
           product={editingProduct}
           onSave={handleSave}
+          onSaveDraft={handleSaveDraft}
           onClose={() => setShowModal(false)}
           calcState={calcState}
           feeRates={feeRates}
