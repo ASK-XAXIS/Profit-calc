@@ -496,7 +496,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
 function BottomNav({ activeTab, onTabChange }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
-      <div className="flex max-w-lg mx-auto items-end">
+      <div className="flex max-w-lg mx-auto items-end pb-safe">
         {TABS.map((tab) => {
           const active = activeTab === tab.id
           const isHome = tab.id === 'home'
@@ -506,14 +506,13 @@ function BottomNav({ activeTab, onTabChange }) {
               onClick={() => onTabChange(tab.id)}
               className={[
                 'flex-1 flex flex-col items-center justify-end transition-colors relative',
-                isHome ? 'pb-1' : 'py-2',
+                isHome ? 'pb-2' : 'py-3 pt-3',
                 !isHome && (active ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'),
               ].join(' ')}
             >
               {tab.icon(active)}
               <span className={[
-                'font-medium',
-                isHome ? 'text-[9px] mt-0.5' : 'text-[9px] mt-0.5',
+                'text-[10px] font-medium mt-1',
                 isHome
                   ? active ? 'text-blue-500' : 'text-gray-400'
                   : active ? 'text-blue-500' : 'text-gray-400',
@@ -593,7 +592,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="pb-24 pt-4 px-3">
+      <main className="pb-32 pt-4 px-3">
         <div className={activeTab === 'home' ? 'block' : 'hidden'}>
           <HomePage onNavigate={setActiveTab} />
         </div>
