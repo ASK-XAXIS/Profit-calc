@@ -979,7 +979,7 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
                 <ul className="text-xs text-gray-600 space-y-1">
                   <li>✅ Excel出力（.xlsx形式）</li>
                   <li>✅ 商品登録 最大100件</li>
-                  <li>✅ まとめ売り 最大5件</li>
+                  <li>✅ まとめ売り 最大5件同時計算</li>
                   <li>✅ 日・月・年の経常利益グラフ</li>
                 </ul>
               </div>

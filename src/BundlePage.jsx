@@ -45,7 +45,7 @@ function ProductSelectModal({ selected, onSelect, onClose, maxBundle }) {
           <div>
             <h2 className="text-white font-bold">商品を選択</h2>
             <p className="text-blue-100 text-xs mt-0.5">{selected.length}/{maxBundle}個選択中
-              {!isPremium() && <span className="ml-1 text-blue-200">（無料：{MAX_BUNDLE_FREE}件まで）</span>}
+              {!isPremium() && <span className="ml-1 text-blue-200">（無料：同時に選択可能な商品は{MAX_BUNDLE_FREE}件まで）</span>}
             </p>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
