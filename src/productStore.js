@@ -1,5 +1,6 @@
+import { getProductLimit } from './planStore'
+
 const STORAGE_KEY = 'flea_market_products'
-const MAX_PRODUCTS = 100
 
 export function getAllProducts() {
   try {
@@ -18,12 +19,13 @@ export function getAllActiveProducts() {
 export function saveProduct(product) {
   const products = getAllProducts()
   const idx = products.findIndex((p) => p.id === product.id)
+  const limit = getProductLimit()
 
   if (idx >= 0) {
     products[idx] = { ...product, updatedAt: new Date().toISOString() }
   } else {
-    if (products.length >= MAX_PRODUCTS) {
-      return { success: false, message: `商品は最大${MAX_PRODUCTS}件まで保存できます。` }
+    if (products.length >= limit) {
+      return { success: false, message: `商品は最大${limit}件まで保存できます。`, limitReached: true }
     }
     products.push({
       ...product,
