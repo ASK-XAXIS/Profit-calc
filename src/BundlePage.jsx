@@ -6,8 +6,10 @@ import { saveSale } from './salesStore'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
 import { FeeBadge, feeLabel } from './feeConfig.jsx'
+import { isPremium } from './planStore'
 
-const MAX_BUNDLE = 5
+const MAX_BUNDLE_FREE    = 2
+const MAX_BUNDLE_PREMIUM = 5
 
 const PLATFORM_META = {
   mercari:  { label: 'メルカリ',     color: 'bg-red-500',    light: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600',    dot: 'bg-red-500'    },
@@ -18,7 +20,7 @@ const PLATFORM_META = {
 const PLATFORM_OPTIONS = Object.entries(PLATFORM_META).map(([k, v]) => ({ value: k, label: v.label }))
 
 // ── 商品選択モーダル ──────────────────────────────────────
-function ProductSelectModal({ selected, onSelect, onClose }) {
+function ProductSelectModal({ selected, onSelect, onClose, maxBundle }) {
   const [products] = useState(() => getAllProducts().filter((p) => !p.isDraft))
   const [search, setSearch] = useState('')
 
@@ -31,7 +33,7 @@ function ProductSelectModal({ selected, onSelect, onClose }) {
     if (isSelected) {
       onSelect(selected.filter((s) => s.id !== p.id))
     } else {
-      if (selected.length >= MAX_BUNDLE) return
+      if (selected.length >= maxBundle) return
       onSelect([...selected, p])
     }
   }
@@ -42,7 +44,9 @@ function ProductSelectModal({ selected, onSelect, onClose }) {
         <div className="bg-blue-500 px-5 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-white font-bold">商品を選択</h2>
-            <p className="text-blue-100 text-xs mt-0.5">{selected.length}/{MAX_BUNDLE}個選択中</p>
+            <p className="text-blue-100 text-xs mt-0.5">{selected.length}/{maxBundle}個選択中
+              {!isPremium() && <span className="ml-1 text-blue-200">（無料：{MAX_BUNDLE_FREE}件まで）</span>}
+            </p>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         </div>
@@ -59,7 +63,7 @@ function ProductSelectModal({ selected, onSelect, onClose }) {
           )}
           {filtered.map((p) => {
             const isSelected = selected.some((s) => s.id === p.id)
-            const isDisabled = !isSelected && selected.length >= MAX_BUNDLE
+            const isDisabled = !isSelected && selected.length >= maxBundle
             const thumb = p.images?.[0] || null
             return (
               <button
@@ -225,6 +229,15 @@ const BUNDLE_DRAFT_KEY = 'bundle_draft'
 
 // ── メインページ ──────────────────────────────────────────
 export default function BundlePage({ feeRates, onFeeRatesChange }) {
+  const [premium, setPremium] = useState(isPremium)
+  const MAX_BUNDLE = premium ? MAX_BUNDLE_PREMIUM : MAX_BUNDLE_FREE
+
+  useEffect(() => {
+    function onPlanUpdate() { setPremium(isPremium()) }
+    window.addEventListener('plan-updated', onPlanUpdate)
+    return () => window.removeEventListener('plan-updated', onPlanUpdate)
+  }, [])
+
   // 一時保存データを初期値として読み込む
   const loadDraft = () => {
     try {
@@ -636,6 +649,7 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
           selected={selected}
           onSelect={setSelected}
           onClose={() => setShowSelect(false)}
+          maxBundle={MAX_BUNDLE}
         />
       )}
 
