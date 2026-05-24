@@ -92,7 +92,7 @@ function BundleWidgetContent() {
         </div>
         <div className="flex-1 rounded-xl py-1.5 text-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
           <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.7)' }}>最大</p>
-          <p className="font-black text-lg leading-none text-white">5</p>
+          <p className="font-black text-lg leading-none text-white">*5</p>
           <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.6)' }}>商品</p>
         </div>
       </div>
@@ -102,6 +102,7 @@ function BundleWidgetContent() {
         </div>
       )}
       <p className="text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.6)' }}>複数商品をまとめて販売する際の価格計算と損益比較</p>
+      <p className="text-[8px] leading-snug" style ={{ color: 'rgba(255,255,255,0.6)'}}>*有料版購入後の最大数です（無料版は最大2商品）</p>
     </div>
   )
 }
