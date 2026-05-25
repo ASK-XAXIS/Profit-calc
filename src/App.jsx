@@ -8,7 +8,7 @@ import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
 import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
-import { isPremium } from './planStore'
+import { isPremium, getCalcCount, incrementCalcCount } from './planStore'
 
 // ─────────────────────────────────────────
 // タブ定義（中央がホーム）
@@ -295,6 +295,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
   }), [])
 
   const [overrides, setOverrides] = useState(initOverride)
+  const [calcCount, setCalcCount] = useState(getCalcCount)
 
   function handleGlobalSell(val) {
     setGlobalSell(val)
@@ -306,6 +307,14 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
       }
       return next
     })
+    // 販売価格入力時に計算回数をカウント（フリーユーザーのみ）
+    if (val !== '' && !isPremium()) {
+      const next = incrementCalcCount()
+      setCalcCount(next)
+      if (next % 10 === 0) {
+        window.__openUpgradeModal?.('calc')
+      }
+    }
   }
 
   function handleOverride(platform, val) {
@@ -542,29 +551,28 @@ export default function App() {
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
-  const [showUpgradeModal, setShowUpgradeModal]   = useState(false)
-const [upgradeTrigger,   setUpgradeTrigger]     = useState('manual')
-const [purchaseSuccess,  setPurchaseSuccess]    = useState(false)
- 
-// Stripe決済リターン処理（ページロード時）
-useEffect(() => {
-  handleStripeReturn().then((success) => {
-    if (success) {
-      setPurchaseSuccess(true)
-      // 3秒後に成功メッセージを消す
-      setTimeout(() => setPurchaseSuccess(false), 3000)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeTrigger,   setUpgradeTrigger]   = useState('manual')
+  const [purchaseSuccess,  setPurchaseSuccess]  = useState(false)
+
+  // Stripe決済リターン処理
+  useEffect(() => {
+    handleStripeReturn().then((success) => {
+      if (success) {
+        setPurchaseSuccess(true)
+        setTimeout(() => setPurchaseSuccess(false), 3000)
+      }
+    })
+  }, [])
+
+  // アップグレードモーダルをwindowに登録
+  useEffect(() => {
+    window.__openUpgradeModal = (trigger = 'manual') => {
+      setUpgradeTrigger(trigger)
+      setShowUpgradeModal(true)
     }
-  })
-}, [])
- 
-// プレミアム訴求モーダルを開くヘルパー（外部から呼び出せるようにwindowに登録）
-useEffect(() => {
-  window.__openUpgradeModal = (trigger = 'manual') => {
-    setUpgradeTrigger(trigger)
-    setShowUpgradeModal(true)
-  }
-  return () => { delete window.__openUpgradeModal }
-}, [])
+    return () => { delete window.__openUpgradeModal }
+  }, [])
 
   const [rakumaFee, setRakumaFee] = useState(loadRakumaFee)
   function handleFeeRatesChange(newRates) {
@@ -675,19 +683,19 @@ useEffect(() => {
       </main>
 
       {/* 購入成功トースト */}
-{purchaseSuccess && (
-  <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
-    <span>🎉</span> プレミアムプランへようこそ！
-  </div>
-)}
- 
-{/* アップグレードモーダル */}
-{showUpgradeModal && (
-  <UpgradeModal
-    trigger={upgradeTrigger}
-    onClose={() => setShowUpgradeModal(false)}
-  />
-)}
+      {purchaseSuccess && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
+          <span>🎉</span> プレミアムプランへようこそ！
+        </div>
+      )}
+
+      {/* アップグレードモーダル */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          trigger={upgradeTrigger}
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>

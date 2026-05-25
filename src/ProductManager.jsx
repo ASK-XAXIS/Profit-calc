@@ -1205,7 +1205,10 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
               <p className="text-white text-xs font-bold">プレミアムにアップグレード</p>
               <p className="text-blue-100 text-[10px]">商品を100件まで登録 + 経常利益グラフ</p>
             </div>
-            <button className="bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0">
+            <button
+              onClick={() => window.__openUpgradeModal?.('banner')}
+              className="bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0"
+            >
               詳しく見る
             </button>
           </div>
@@ -1230,7 +1233,10 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
                   <li>✅ 広告非表示</li>
                 </ul>
               </div>
-              <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-2xl text-sm shadow">
+              <button
+                onClick={() => { setShowLimitModal(false); window.__openUpgradeModal?.('limit') }}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-2xl text-sm shadow"
+              >
                 プレミアムにアップグレード
               </button>
               <button
