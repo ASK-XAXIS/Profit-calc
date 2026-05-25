@@ -7,6 +7,12 @@ import SummaryPage from './SummaryPage'
 import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
+// 既存の import { useState, ... } の useEffect を追加
+import { useState, useCallback, useMemo, useEffect } from 'react'
+
+// 末尾に2行追加
+import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
+import { isPremium } from './planStore'
 
 // ─────────────────────────────────────────
 // タブ定義（中央がホーム）
@@ -540,6 +546,30 @@ export default function App() {
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
 
+  const [showUpgradeModal, setShowUpgradeModal]   = useState(false)
+const [upgradeTrigger,   setUpgradeTrigger]     = useState('manual')
+const [purchaseSuccess,  setPurchaseSuccess]    = useState(false)
+ 
+// Stripe決済リターン処理（ページロード時）
+useEffect(() => {
+  handleStripeReturn().then((success) => {
+    if (success) {
+      setPurchaseSuccess(true)
+      // 3秒後に成功メッセージを消す
+      setTimeout(() => setPurchaseSuccess(false), 3000)
+    }
+  })
+}, [])
+ 
+// プレミアム訴求モーダルを開くヘルパー（外部から呼び出せるようにwindowに登録）
+useEffect(() => {
+  window.__openUpgradeModal = (trigger = 'manual') => {
+    setUpgradeTrigger(trigger)
+    setShowUpgradeModal(true)
+  }
+  return () => { delete window.__openUpgradeModal }
+}, [])
+
   const [rakumaFee, setRakumaFee] = useState(loadRakumaFee)
   function handleFeeRatesChange(newRates) {
     const val = newRates.rakuma ?? rakumaFee
@@ -647,6 +677,21 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* 購入成功トースト */}
+{purchaseSuccess && (
+  <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
+    <span>🎉</span> プレミアムプランへようこそ！
+  </div>
+)}
+ 
+{/* アップグレードモーダル */}
+{showUpgradeModal && (
+  <UpgradeModal
+    trigger={upgradeTrigger}
+    onClose={() => setShowUpgradeModal(false)}
+  />
+)}
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
