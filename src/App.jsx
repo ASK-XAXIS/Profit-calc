@@ -8,6 +8,7 @@ import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
 import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
+import AdBanner from './AdBanner'
 import { isPremium, canUseCalc, getRemainingCalcCount, incrementDailyCalcCount, getDailyCalcCount } from './planStore'
 
 // ─────────────────────────────────────────
@@ -560,6 +561,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
               <button onClick={clearAll} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 transition">全てクリア（結果を閉じる）</button>
             </div>
           </div>
+          <AdBanner slot="6515851195" className="mt-1" />
         </>
       )}
     </div>
@@ -716,8 +718,12 @@ export default function App() {
         <div className={legalPage ? 'hidden' : ''}>
           <div className={activeTab === 'home' ? 'block' : 'hidden'}>
             <HomePage onNavigate={setActiveTab} onLegal={setLegalPage} />
+            <div className="mt-3">
+              <AdBanner slot="6515851195" />
+            </div>
           </div>
           <div className={activeTab === 'products' ? 'block' : 'hidden'}>
+            <AdBanner slot="6515851195" className="mb-3" />
             <ProductManager
               calcState={calcState}
               onLoadToCalc={handleLoadToCalc}
