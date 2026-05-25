@@ -124,7 +124,7 @@ export default function UpgradeModal({ onClose, trigger = 'manual' }) {
           {[
             { icon: '📦', text: '商品登録 最大100件（無料は15件）' },
             { icon: '🛒', text: 'まとめ売り 最大5商品（無料は2商品）' },
-            { icon: '📊', text: '経常利益グラフ（日/月/年）' },
+            { icon: '🔓', text: '計算機の1日10回制限を解除' },
             { icon: '📥', text: 'Excel出力機能' },
             { icon: '🚫', text: '広告非表示' },
           ].map((item) => (
