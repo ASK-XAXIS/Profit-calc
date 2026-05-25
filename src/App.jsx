@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
 import { loadRakumaFee, saveRakumaFee, FeeBadge } from './feeConfig.jsx'
@@ -7,10 +7,6 @@ import SummaryPage from './SummaryPage'
 import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
-// 既存の import { useState, ... } の useEffect を追加
-import { useState, useCallback, useMemo, useEffect } from 'react'
-
-// 末尾に2行追加
 import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
 import { isPremium } from './planStore'
 
