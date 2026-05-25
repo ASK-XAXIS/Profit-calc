@@ -8,7 +8,7 @@ import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
 import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
-import { isPremium, getCalcCount, incrementCalcCount } from './planStore'
+import { isPremium, canUseCalc, getRemainingCalcCount, incrementDailyCalcCount, getDailyCalcCount } from './planStore'
 
 // ─────────────────────────────────────────
 // タブ定義（中央がホーム）
@@ -295,7 +295,8 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
   }), [])
 
   const [overrides, setOverrides] = useState(initOverride)
-  const [calcCount, setCalcCount] = useState(getCalcCount)
+  const [dailyCalcCount, setDailyCalcCount] = useState(getDailyCalcCount)
+  const [calcLocked, setCalcLocked] = useState(() => !canUseCalc())
 
   function handleGlobalSell(val) {
     setGlobalSell(val)
@@ -307,25 +308,33 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
       }
       return next
     })
-    // 販売価格入力時に計算回数をカウント（フリーユーザーのみ）
-    if (val !== '' && !isPremium()) {
-      const next = incrementCalcCount()
-      setCalcCount(next)
-      if (next % 10 === 0) {
-        window.__openUpgradeModal?.('calc')
-      }
-    }
   }
 
   function handleOverride(platform, val) {
     setOverrides((prev) => ({ ...prev, [platform]: val }))
   }
 
+  // クリアボタン共通処理（カウント＋ロック判定）
+  function handleClearCount() {
+    if (isPremium()) return
+    const { count, isLimitReached, wasAlreadyLocked } = incrementDailyCalcCount()
+    setDailyCalcCount(count)
+    if (isLimitReached && !wasAlreadyLocked) {
+      // ちょうど10回目 → モーダルを出す
+      window.__openUpgradeModal?.('calc')
+    }
+    if (isLimitReached) {
+      setCalcLocked(true)
+    }
+  }
+
   function clearAll() {
+    handleClearCount()
     setGlobalSell(''); setGlobalBuy(''); setGlobalPack('')
     setShowPackInput(false); setOverrides(initOverride())
   }
   function clearSellAll() {
+    handleClearCount()
     setGlobalSell('')
     setOverrides((prev) => {
       const n = { ...prev }
@@ -334,6 +343,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     })
   }
   function clearShipAll() {
+    handleClearCount()
     setOverrides((prev) => {
       const n = { ...prev }
       for (const pf of PLATFORMS) n[pf] = { ...prev[pf], service: '', shipping: '', shipAndPackCost: '' }
@@ -341,6 +351,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     })
   }
   function clearPackAll() {
+    handleClearCount()
     setGlobalPack('')
     setOverrides((prev) => {
       const n = { ...prev }
@@ -372,6 +383,30 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
 
   return (
     <div className="w-full max-w-lg mx-auto flex flex-col gap-3">
+
+      {/* 計算回数上限バナー（フリープランのみ） */}
+      {!isPremium() && (
+        <div className={`rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 ${calcLocked ? 'bg-red-50 border border-red-200' : dailyCalcCount >= 7 ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-100'}`}>
+          <div>
+            {calcLocked ? (
+              <>
+                <p className="text-xs font-bold text-red-600">本日の計算回数の上限（10回）に達しました</p>
+                <p className="text-[10px] text-red-400">日本時間 0:00 にリセットされます</p>
+              </>
+            ) : (
+              <p className="text-[10px] text-gray-500">本日の残り計算回数：<span className="font-bold text-gray-700">{getRemainingCalcCount()}回</span></p>
+            )}
+          </div>
+          {calcLocked && (
+            <button
+              onClick={() => window.__openUpgradeModal?.('calc')}
+              className="shrink-0 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white"
+            >
+              解除する
+            </button>
+          )}
+        </div>
+      )}
 
       {loadedProduct && (
         <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 flex items-center justify-between gap-2">
@@ -491,11 +526,11 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">クリア</p>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={clearSellAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">販売価格 クリア</button>
+          <button onClick={clearSellAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">販売価格 クリア</button>
           <button onClick={() => setGlobalBuy('')} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">仕入れ額 クリア</button>
-          <button onClick={clearShipAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">発送方法 クリア</button>
-          <button onClick={clearPackAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">梱包材費 クリア</button>
-          <button onClick={clearAll} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 transition">全てクリア</button>
+          <button onClick={clearShipAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">発送方法 クリア</button>
+          <button onClick={clearPackAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">梱包材費 クリア</button>
+          <button onClick={clearAll} disabled={calcLocked} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition">全てクリア</button>
         </div>
       </div>
     </div>
