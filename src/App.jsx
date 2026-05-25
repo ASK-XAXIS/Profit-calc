@@ -286,6 +286,7 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
   const [globalBuy,  setGlobalBuy]        = useState('')
   const [showPackInput, setShowPackInput] = useState(false)
   const [globalPack,    setGlobalPack]    = useState('')
+  const [showResult,    setShowResult]    = useState(false) // 計算結果表示フラグ
 
   const initOverride = useCallback(() => ({
     mercari:  { sellPrice: '', service: '', shipping: '', packCost: '0', shipAndPackCost: '' },
@@ -314,27 +315,32 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     setOverrides((prev) => ({ ...prev, [platform]: val }))
   }
 
-  // クリアボタン共通処理（カウント＋ロック判定）
-  function handleClearCount() {
-    if (isPremium()) return
-    const { count, isLimitReached, wasAlreadyLocked } = incrementDailyCalcCount()
-    setDailyCalcCount(count)
-    if (isLimitReached && !wasAlreadyLocked) {
-      // ちょうど10回目 → モーダルを出す
+  // 「計算する」ボタン処理
+  function handleCalc() {
+    if (calcLocked) {
       window.__openUpgradeModal?.('calc')
+      return
     }
-    if (isLimitReached) {
-      setCalcLocked(true)
+    if (!isPremium()) {
+      const { count, isLimitReached, wasAlreadyLocked } = incrementDailyCalcCount()
+      setDailyCalcCount(count)
+      if (isLimitReached && !wasAlreadyLocked) {
+        window.__openUpgradeModal?.('calc')
+      }
+      if (isLimitReached) {
+        setCalcLocked(true)
+        return
+      }
     }
+    setShowResult(true)
   }
 
   function clearAll() {
-    handleClearCount()
     setGlobalSell(''); setGlobalBuy(''); setGlobalPack('')
     setShowPackInput(false); setOverrides(initOverride())
+    setShowResult(false)
   }
   function clearSellAll() {
-    handleClearCount()
     setGlobalSell('')
     setOverrides((prev) => {
       const n = { ...prev }
@@ -343,7 +349,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     })
   }
   function clearShipAll() {
-    handleClearCount()
     setOverrides((prev) => {
       const n = { ...prev }
       for (const pf of PLATFORMS) n[pf] = { ...prev[pf], service: '', shipping: '', shipAndPackCost: '' }
@@ -351,7 +356,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
     })
   }
   function clearPackAll() {
-    handleClearCount()
     setGlobalPack('')
     setOverrides((prev) => {
       const n = { ...prev }
@@ -421,42 +425,47 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
       {/* 共通入力 */}
       <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">共通入力</p>
+
+        {/* 入力説明バッジ */}
+        <div className="flex flex-col gap-1.5 mb-3">
+          <div className="flex items-start gap-1.5 bg-blue-50 rounded-xl px-3 py-2">
+            <span className="text-blue-400 text-[10px] mt-0.5">💡</span>
+            <p className="text-[10px] text-blue-600 leading-relaxed">
+              <span className="font-bold">販売額を未入力</span>の場合、損益ゼロになる<span className="font-bold">最低販売額</span>を表示します
+            </p>
+          </div>
+          <div className="flex items-start gap-1.5 bg-emerald-50 rounded-xl px-3 py-2">
+            <span className="text-emerald-400 text-[10px] mt-0.5">💡</span>
+            <p className="text-[10px] text-emerald-600 leading-relaxed">
+              <span className="font-bold">仕入額を未入力</span>の場合、損益ゼロになる<span className="font-bold">最高仕入額</span>を表示します
+            </p>
+          </div>
+        </div>
+
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-500 mb-1">販売価格（円）</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">販売額（円）</label>
             <input type="text" inputMode="numeric" value={globalSell}
               onChange={(e) => {
                 const v = e.target.value
                 if (v === '' || /^[0-9]+$/.test(v)) handleGlobalSell(v === '' ? '' : Number(v))
               }}
-              placeholder="未入力→最低販売価格"
+              placeholder="未入力 → 最低販売額"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
             />
           </div>
           <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-500 mb-1">
-              仕入れ額（円）
-            </label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">仕入額（円）</label>
             <input type="text" inputMode="numeric" value={globalBuy}
               onChange={(e) => {
                 const v = e.target.value
                 if (v === '' || /^[0-9]+$/.test(v)) setGlobalBuy(v === '' ? '' : Number(v))
               }}
-              placeholder="未入力"
+              placeholder="未入力 → 最高仕入額"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
             />
           </div>
         </div>
-
-        {/* 入力状態ヒント */}
-        <p className="text-[9px] text-gray-300 mt-2 text-center">
-          {globalSell === '' && globalBuy !== ''
-            ? '💡 仕入れ額をもとに各プラットフォームの最低販売価格を表示中'
-            : globalSell === '' && globalBuy === ''
-            ? '販売価格または仕入れ額を入力してください'
-            : '各プラットフォームの販売価格・発送方法・梱包材は個別に変更できます'
-          }
-        </p>
 
         {/* 梱包材費一括入力 */}
         <div className="mt-3 border-t border-gray-100 pt-3">
@@ -499,40 +508,60 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
             </div>
           )}
         </div>
+
+        {/* 計算するボタン */}
+        <button
+          onClick={handleCalc}
+          disabled={globalSell === '' && globalBuy === ''}
+          className="mt-3 w-full rounded-xl bg-blue-500 py-3 text-sm font-black text-white hover:bg-blue-600 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <path d="M8 7h8M8 11h3M8 15h3M15 11h1M15 15h1" />
+          </svg>
+          計算する
+          {!isPremium() && !calcLocked && (
+            <span className="text-blue-200 text-[10px] font-normal">（残り{getRemainingCalcCount()}回）</span>
+          )}
+        </button>
       </div>
 
-      {/* 4列 */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {PLATFORMS.map((pf) => (
-          <PlatformColumn
-            key={pf}
-            platform={pf}
-            globalSell={globalSell}
-            buyPrice={globalBuy}
-            overrides={overrides}
-            onOverride={handleOverride}
-            feeRates={feeRates}
-            onFeeRatesChange={onFeeRatesChange}
-          />
-        ))}
-      </div>
+      {/* 4列プラットフォーム結果（計算後のみ表示） */}
+      {showResult && (
+        <>
+          <div className="grid grid-cols-4 gap-1.5">
+            {PLATFORMS.map((pf) => (
+              <PlatformColumn
+                key={pf}
+                platform={pf}
+                globalSell={globalSell}
+                buyPrice={globalBuy}
+                overrides={overrides}
+                onOverride={handleOverride}
+                feeRates={feeRates}
+                onFeeRatesChange={onFeeRatesChange}
+              />
+            ))}
+          </div>
 
-      <button onClick={handleRegisterFromCalc}
-        className="w-full rounded-xl border border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition">
-        この情報内容で商品管理に新規登録する →
-      </button>
+          <button onClick={handleRegisterFromCalc}
+            className="w-full rounded-xl border border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition">
+            この情報内容で商品管理に新規登録する →
+          </button>
 
-      {/* クリアボタン群 */}
-      <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">クリア</p>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={clearSellAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">販売価格 クリア</button>
-          <button onClick={() => setGlobalBuy('')} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">仕入れ額 クリア</button>
-          <button onClick={clearShipAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">発送方法 クリア</button>
-          <button onClick={clearPackAll} disabled={calcLocked} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition">梱包材費 クリア</button>
-          <button onClick={clearAll} disabled={calcLocked} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition">全てクリア</button>
-        </div>
-      </div>
+          {/* クリアボタン群 */}
+          <div className="bg-white rounded-2xl shadow-sm px-4 py-4">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">クリア</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={clearSellAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">販売額 クリア</button>
+              <button onClick={() => setGlobalBuy('')} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">仕入額 クリア</button>
+              <button onClick={clearShipAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">発送方法 クリア</button>
+              <button onClick={clearPackAll} className="rounded-xl border border-gray-200 bg-gray-50 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition">梱包材費 クリア</button>
+              <button onClick={clearAll} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 transition">全てクリア（結果を閉じる）</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
