@@ -980,7 +980,7 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
                   <li>✅ Excel出力（.xlsx形式）</li>
                   <li>✅ 商品登録 最大100件</li>
                   <li>✅ まとめ売り 最大5件同時計算</li>
-                  <li>✅ 日・月・年の経常利益グラフ</li>
+                  <li>✅ 計算機の1日10回制限を解除</li>
                 </ul>
               </div>
               <button className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 rounded-2xl text-sm shadow">
