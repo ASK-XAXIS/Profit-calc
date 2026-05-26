@@ -378,7 +378,7 @@ export default function HomePage({ onNavigate, onLegal }) {
         <div>
           <div className="flex items-baseline gap-1.5">
             <h2 className="text-lg font-black text-blue-500 tracking-tight">Revofit</h2>
-            <span className="text-[10px] text-gray-400 font-normal">レヴォフィット</span>
+            <span className="text-[10px] text-gray-400 font-normal">レボフィット</span>
           </div>
           <p className="text-[10px] text-gray-400">
             {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
