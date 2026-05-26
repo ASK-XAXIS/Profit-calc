@@ -760,6 +760,14 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
             </svg>
             Excel{!premium && <span className="ml-0.5">🔒</span>}
           </button>
+          {!premium && (
+            <button
+              onClick={() => window.__openUpgradeModal?.('manual')}
+              className="flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 transition"
+            >
+              👑 プレミアム
+            </button>
+          )}
           <button onClick={() => setShowNewSale(true)}
             className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition">
             ＋ 売上登録
@@ -983,7 +991,10 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
                   <li>✅ 計算機の1日10回制限を解除</li>
                 </ul>
               </div>
-              <button className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 rounded-2xl text-sm shadow">
+              <button
+                onClick={() => { setShowExcelLock(false); window.__openUpgradeModal?.('manual') }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 rounded-2xl text-sm shadow"
+              >
                 プレミアムにアップグレード
               </button>
               <button

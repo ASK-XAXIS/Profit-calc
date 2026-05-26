@@ -8,7 +8,6 @@ import BundlePage from './BundlePage'
 import HomePage from './HomePage'
 import { PrivacyPolicy, TermsOfService, CommercialDisclosure } from './LegalPages'
 import UpgradeModal, { handleStripeReturn } from './UpgradeModal'
-import AdBanner from './AdBanner'
 import { isPremium, canUseCalc, getRemainingCalcCount, incrementDailyCalcCount, getDailyCalcCount } from './planStore'
 
 // ─────────────────────────────────────────
@@ -561,7 +560,6 @@ function CalcPage({ loadedProduct, setLoadedProduct, onSwitchToProducts, feeRate
               <button onClick={clearAll} className="col-span-2 rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-500 hover:bg-red-100 transition">全てクリア（結果を閉じる）</button>
             </div>
           </div>
-          <AdBanner slot="6515851195" className="mt-1" />
         </>
       )}
     </div>
@@ -616,6 +614,7 @@ export default function App() {
   const [legalPage, setLegalPage]         = useState(null) // 'privacy' | 'terms' | 'commercial'
   const [viewMode, setViewMode]           = useState(() => localStorage.getItem('product_view_mode') || 'list')
   const [loadedProduct, setLoadedProduct] = useState(null)
+  const [premium, setPremium] = useState(isPremium)
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [upgradeTrigger,   setUpgradeTrigger]   = useState('manual')
@@ -629,6 +628,13 @@ export default function App() {
         setTimeout(() => setPurchaseSuccess(false), 3000)
       }
     })
+  }, [])
+
+  // プラン更新イベント
+  useEffect(() => {
+    function onPlanUpdate() { setPremium(isPremium()) }
+    window.addEventListener('plan-updated', onPlanUpdate)
+    return () => window.removeEventListener('plan-updated', onPlanUpdate)
   }, [])
 
   // アップグレードモーダルをwindowに登録
@@ -691,6 +697,15 @@ export default function App() {
           {activeTab === 'products' && (
             <ViewModeToggle viewMode={viewMode} onChange={handleViewModeChange} />
           )}
+          {/* アップグレードボタン（フリープランのみ・法的ページ以外） */}
+          {!premium && !legalPage && (
+            <button
+              onClick={() => window.__openUpgradeModal?.('manual')}
+              className="flex items-center gap-1 rounded-lg bg-blue-500 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-blue-600 transition shrink-0"
+            >
+              👑 <span className="hidden sm:inline">アップグレード</span>
+            </button>
+          )}
           {/* リロードボタン（ソフトリフレッシュ） */}
           <button
             onClick={() => {
@@ -718,12 +733,8 @@ export default function App() {
         <div className={legalPage ? 'hidden' : ''}>
           <div className={activeTab === 'home' ? 'block' : 'hidden'}>
             <HomePage onNavigate={setActiveTab} onLegal={setLegalPage} />
-            <div className="mt-3">
-              <AdBanner slot="6515851195" />
-            </div>
           </div>
           <div className={activeTab === 'products' ? 'block' : 'hidden'}>
-            <AdBanner slot="6515851195" className="mb-3" />
             <ProductManager
               calcState={calcState}
               onLoadToCalc={handleLoadToCalc}
