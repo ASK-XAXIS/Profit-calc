@@ -1,6 +1,6 @@
 // LegalPages.jsx — プライバシーポリシー / 利用規約 / 特定商取引法に基づく表記
 
-const UPDATED = '2025年6月1日'
+const UPDATED = '2026年5月26日'
 const APP_NAME = 'Revofit（レヴォフィット）'
 const OPERATOR = 'RYO MORITOU'
 const ADDRESS  = '沖縄県豊見城市字豊見城1004-1 ウィングシャトー豊見城プロムナード708'
@@ -224,11 +224,14 @@ export function TermsOfService({ onBack }) {
       <Section title="第7条（プレミアムプランについて）">
         <p>
           本アプリは無料プランと有料プレミアムプランを提供しています。
-          プレミアムプランの購入・解約・払い戻しについては、各ストア（App Store / Google Play）
-          のポリシーに従います。
+        </p>
+        <p className="mt-2">
+          Web版のプレミアムプランはStripeによる買い切り決済（¥980・税込）です。
+          iOS版・Android版はそれぞれApp Store / Google Playの決済システムに従います。
         </p>
         <p className="mt-2">
           デジタルコンテンツの性質上、購入完了後の返金は原則として対応しておりません。
+          ただし法令に基づく場合はこの限りではありません。
         </p>
       </Section>
 
@@ -270,8 +273,8 @@ export function CommercialDisclosure({ onBack }) {
     { label: 'メールアドレス',   value: EMAIL },
     { label: '電話番号',         value: 'メールにてお問い合わせください（お問い合わせ後、必要に応じてご連絡します）' },
     { label: 'サービス名',       value: APP_NAME },
-    { label: '販売価格',         value: 'アプリ内の各プランページに表示する価格（税込）' },
-    { label: '支払方法',         value: 'App Store / Google Play の決済システムに準じます（クレジットカード等）' },
+    { label: '販売価格',         value: 'プレミアムプラン：¥980（税込・買い切り）' },
+    { label: '支払方法',         value: 'クレジットカード（Stripe決済）/ App Store / Google Play の決済システム' },
     { label: '支払時期',         value: '購入手続き完了時にお支払いとなります' },
     { label: 'サービス提供時期', value: '購入完了後、即時ご利用いただけます' },
     { label: '返品・キャンセル', value: 'デジタルコンテンツの性質上、購入完了後の返金・キャンセルは原則として対応しておりません。ただし法令に基づく場合はこの限りではありません。' },
