@@ -3,7 +3,7 @@
 const UPDATED = '2026年5月26日'
 const APP_NAME = 'Revofit（レヴォフィット）'
 const OPERATOR = 'RYO MORITOU'
-const ADDRESS  = '沖縄県豊見城市字豊見城1004-1 ウィングシャトー豊見城プロムナード708'
+const ADDRESS  = '沖縄県豊見城市字豊見城1004-1-708'
 const EMAIL    = 'ryo06040123@gmail.com'
 
 // ─────────────────────────────────────────
