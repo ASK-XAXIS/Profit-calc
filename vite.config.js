@@ -11,7 +11,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'ogp.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Revofit（レヴォフィット）',
+        name: 'Revofit（レボフィット）',
         short_name: 'Revofit',
         description: 'メルカリ・Yahoo!フリマ・ラクマ・ヤフオクの利益を一括計算',
         theme_color: '#3b82f6',

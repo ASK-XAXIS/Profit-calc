@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Revofit</string>
+    <string name="title_activity_main">Revofit</string>
+    <string name="package_name">jp.revofit.app</string>
+    <string name="custom_url_scheme">jp.revofit.app</string>
+</resources>

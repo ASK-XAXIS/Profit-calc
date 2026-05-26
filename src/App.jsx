@@ -683,7 +683,7 @@ export default function App() {
             ) : activeTab === 'home' ? (
               <span className="flex items-center gap-1.5">
                 <span className="text-blue-500 font-black tracking-tight">Revofit</span>
-                <span className="text-[10px] font-normal text-gray-400">レヴォフィット</span>
+                <span className="text-[10px] font-normal text-gray-400">レボフィット</span>
               </span>
             ) : (
               <>
