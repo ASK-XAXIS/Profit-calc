@@ -414,7 +414,19 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
   const totalBuyPrice = useMemo(() =>
     selected.reduce((sum, p) => sum + (Number(p.buyPrice) || 0), 0), [selected])
 
-  // 個別販売した場合の利益合計（各商品の sellPrice × 手数料率 で計算）
+  // 商品の登録データからplatform/service/shippingで送料を取得するヘルパー
+  function getProductShipFee(p) {
+    if (!p.platform || !p.service || !p.shipping) return 0
+    const services = shippingOptions[p.platform] || []
+    const svcObj   = services.find((s) => s.service === p.service)
+    if (!svcObj) return 0
+    // 匿名配送以外（non-anonymous）は送料を商品のshipAndPackCostから取る
+    if (svcObj.anonymous === false) return 0
+    const shipOpt = (svcObj.options || []).find((o) => o.value === p.shipping)
+    return shipOpt ? shipOpt.fee : 0
+  }
+
+  // 個別販売した場合の利益合計（商品管理に登録の発送方法の送料を使用）
   const individualTotal = useMemo(() => {
     if (!platform) return null
     const rate = feeRates?.[platform] ?? defaultFeeRate[platform] ?? 0
@@ -422,7 +434,7 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
       const sp = Number(p.sellPrice) || 0
       if (sp === 0) return sum
       const fee = Math.round(sp * rate)
-      const sf  = Number(p.selectedRoute?.shippingFee) || 0
+      const sf  = getProductShipFee(p)
       const pc  = Number(p.packCost) || 0
       return sum + (sp - (Number(p.buyPrice) || 0) - fee - sf - pc)
     }, 0)
@@ -696,9 +708,14 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
                     ⚠ 個別販売より{Math.abs(profitDiff).toLocaleString()}円少ない利益になります
                   </p>
                 )}
-                {profitDiff !== null && profitDiff >= 0 && (
+                {profitDiff !== null && profitDiff > 0 && (
                   <p className="text-[10px] text-emerald-500 mt-1">
-                    ✓ 個別販売より{profitDiff.toLocaleString()}円多い（または同等の）利益です
+                    ✓ まとめ売りの方が個別販売より<span className="font-bold">+{profitDiff.toLocaleString()}円</span>お得です（送料1回分の節約）
+                  </p>
+                )}
+                {profitDiff !== null && profitDiff === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    個別販売と同等の利益です
                   </p>
                 )}
               </div>
