@@ -465,8 +465,19 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
   // 売れた！保存
   function handleSoldSave(sale) {
     saveSale(sale)
+    // 同じ商品が複数選択されている場合、選択数分まとめて在庫を減らす
+    const countMap = {}
     for (const p of selected) {
-      const newStock = Math.max((Number(p.stock) || 1) - 1, 0)
+      const id = p.id
+      countMap[id] = (countMap[id] || 0) + 1
+    }
+    // 同じIDは1回だけsaveProductを呼ぶ
+    const processed = new Set()
+    for (const p of selected) {
+      if (processed.has(p.id)) continue
+      processed.add(p.id)
+      const soldCount = countMap[p.id] || 1
+      const newStock  = Math.max((Number(p.stock) || 1) - soldCount, 0)
       saveProduct({ ...p, stock: newStock })
     }
     clearDraft()
