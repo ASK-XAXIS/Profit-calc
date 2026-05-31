@@ -21,6 +21,8 @@ export function getPlan() {
 }
 
 export function isPremium() {
+  // 環境変数でプレミアム強制（開発・検証用）
+  if (import.meta.env.VITE_FORCE_PREMIUM === 'true') return true
   return getPlan() === 'premium'
 }
 
