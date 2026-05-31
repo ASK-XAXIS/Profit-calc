@@ -6,8 +6,10 @@ import { saveSale } from './salesStore'
 import { feeRate as defaultFeeRate, shippingOptions } from './constants'
 import { calcFee, calcProfit } from './calc'
 import { FeeBadge, feeLabel } from './feeConfig.jsx'
+import { isPremium } from './planStore'
 
-const MAX_BUNDLE = 5
+const MAX_BUNDLE_FREE    = 2
+const MAX_BUNDLE_PREMIUM = 5
 
 const PLATFORM_META = {
   mercari:  { label: 'メルカリ',     color: 'bg-red-500',    light: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600',    dot: 'bg-red-500'    },
@@ -18,22 +20,61 @@ const PLATFORM_META = {
 const PLATFORM_OPTIONS = Object.entries(PLATFORM_META).map(([k, v]) => ({ value: k, label: v.label }))
 
 // ── 商品選択モーダル ──────────────────────────────────────
-function ProductSelectModal({ selected, onSelect, onClose }) {
+function ProductSelectModal({ selected, onSelect, onClose, maxBundle }) {
   const [products] = useState(() => getAllProducts().filter((p) => !p.isDraft))
   const [search, setSearch] = useState('')
+  const [tab, setTab] = useState('registered') // 'registered' | 'manual'
+
+  // 手動入力フォーム
+  const [manualName,     setManualName]     = useState('')
+  const [manualBuyPrice, setManualBuyPrice] = useState('')
+  const [manualSellPrice,setManualSellPrice]= useState('')
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  function toggle(p) {
-    const isSelected = selected.some((s) => s.id === p.id)
-    if (isSelected) {
-      onSelect(selected.filter((s) => s.id !== p.id))
-    } else {
-      if (selected.length >= MAX_BUNDLE) return
-      onSelect([...selected, p])
+  // 同じ商品の選択数を数える
+  function countSelected(id) {
+    return selected.filter((s) => s.id === id).length
+  }
+
+  // 在庫数を取得（stock未設定の場合は1とみなす）
+  function getStock(p) {
+    return Number(p.stock) > 0 ? Number(p.stock) : 1
+  }
+
+  function add(p) {
+    if (selected.length >= maxBundle) return
+    const count = countSelected(p.id)
+    if (count >= getStock(p)) return
+    // 同じ商品を複数追加する場合はユニークキーを付与
+    onSelect([...selected, { ...p, _bundleKey: `${p.id}_${Date.now()}` }])
+  }
+
+  function remove(p) {
+    // 同じIDの中で最後に追加されたものを1つ削除
+    const idx = [...selected].map((s,i)=>({s,i})).reverse().find(({s}) => s.id === p.id)?.i
+    if (idx === undefined) return
+    const next = [...selected]
+    next.splice(idx, 1)
+    onSelect(next)
+  }
+
+  function addManual() {
+    if (!manualName.trim()) return
+    if (selected.length >= maxBundle) return
+    const manual = {
+      id:        `manual_${Date.now()}`,
+      _bundleKey:`manual_${Date.now()}`,
+      name:      manualName.trim(),
+      buyPrice:  manualBuyPrice !== '' ? Number(manualBuyPrice) : 0,
+      sellPrice: manualSellPrice !== '' ? Number(manualSellPrice) : '',
+      images:    [],
+      isManual:  true,
     }
+    onSelect([...selected, manual])
+    setManualName(''); setManualBuyPrice(''); setManualSellPrice('')
   }
 
   return (
@@ -42,63 +83,130 @@ function ProductSelectModal({ selected, onSelect, onClose }) {
         <div className="bg-blue-500 px-5 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-white font-bold">商品を選択</h2>
-            <p className="text-blue-100 text-xs mt-0.5">{selected.length}/{MAX_BUNDLE}個選択中</p>
+            <p className="text-blue-100 text-xs mt-0.5">{selected.length}/{maxBundle}個選択中
+              {!isPremium() && <span className="ml-1 text-blue-200">（無料：最大{MAX_BUNDLE_FREE}件）</span>}
+            </p>
           </div>
           <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         </div>
-        <div className="px-4 py-3 border-b border-gray-100">
-          <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="商品名で検索..."
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+
+        {/* タブ切り替え */}
+        <div className="flex border-b border-gray-100">
+          {[['registered','登録済み商品'],['manual','手動入力']].map(([v,l]) => (
+            <button key={v} onClick={() => setTab(v)}
+              className={['flex-1 py-2.5 text-xs font-semibold transition',
+                tab === v ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400'].join(' ')}
+            >{l}</button>
+          ))}
         </div>
-        <div className="overflow-y-auto divide-y divide-gray-50" style={{ maxHeight: '50vh' }}>
-          {filtered.length === 0 && (
-            <p className="text-center text-sm text-gray-400 py-8">商品がありません</p>
-          )}
-          {filtered.map((p) => {
-            const isSelected = selected.some((s) => s.id === p.id)
-            const isDisabled = !isSelected && selected.length >= MAX_BUNDLE
-            const thumb = p.images?.[0] || null
-            return (
-              <button
-                key={p.id}
-                onClick={() => toggle(p)}
-                disabled={isDisabled}
-                className={[
-                  'w-full flex items-center gap-3 px-4 py-3 transition',
-                  isSelected ? 'bg-blue-50' : isDisabled ? 'opacity-40' : 'hover:bg-gray-50',
-                ].join(' ')}
-              >
-                {/* チェックボックス */}
-                <div className={[
-                  'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition',
-                  isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300',
-                ].join(' ')}>
-                  {isSelected && (
-                    <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M2 6l2.5 2.5L10 3" />
-                    </svg>
-                  )}
-                </div>
-                {/* サムネ */}
-                {thumb
-                  ? <img src={thumb} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                  : <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
-                }
-                {/* 情報 */}
-                <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
-                  <p className="text-xs text-gray-400">
-                    仕入れ ¥{Number(p.buyPrice).toLocaleString()}
-                    {p.sellPrice !== '' && ` / 売値 ¥${Number(p.sellPrice).toLocaleString()}`}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+
+        {tab === 'registered' ? (
+          <>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <input
+                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="商品名で検索..."
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div className="overflow-y-auto divide-y divide-gray-50" style={{ maxHeight: '45vh' }}>
+              {filtered.length === 0 && (
+                <p className="text-center text-sm text-gray-400 py-8">商品がありません</p>
+              )}
+              {filtered.map((p) => {
+                const count    = countSelected(p.id)
+                const stock    = getStock(p)
+                const canAdd   = selected.length < maxBundle && count < stock
+                const canRemove= count > 0
+                const thumb    = p.images?.[0] || null
+                return (
+                  <div key={p.id} className="w-full flex items-center gap-3 px-4 py-3">
+                    {/* サムネ */}
+                    {thumb
+                      ? <img src={thumb} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      : <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
+                    }
+                    {/* 情報 */}
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400">
+                        仕入れ ¥{Number(p.buyPrice).toLocaleString()}
+                        {p.sellPrice !== '' && ` / 売値 ¥${Number(p.sellPrice).toLocaleString()}`}
+                        {stock > 1 && <span className="ml-1 text-blue-400">在庫{stock}個</span>}
+                      </p>
+                    </div>
+                    {/* 数量コントロール */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => remove(p)}
+                        disabled={!canRemove}
+                        className="w-7 h-7 rounded-full border-2 border-gray-300 text-gray-500 font-bold text-lg flex items-center justify-center disabled:opacity-30 hover:border-red-400 hover:text-red-400 transition"
+                      >−</button>
+                      <span className={['w-5 text-center text-sm font-bold', count > 0 ? 'text-blue-500' : 'text-gray-300'].join(' ')}>
+                        {count}
+                      </span>
+                      <button
+                        onClick={() => add(p)}
+                        disabled={!canAdd}
+                        className="w-7 h-7 rounded-full border-2 border-blue-400 text-blue-500 font-bold text-lg flex items-center justify-center disabled:opacity-30 hover:bg-blue-500 hover:text-white transition"
+                      >＋</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="px-4 py-4 space-y-3" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+            <p className="text-xs text-gray-500">商品登録されていない商品を手動で追加できます</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">商品名 <span className="text-red-400">*</span></label>
+              <input type="text" value={manualName} onChange={(e) => setManualName(e.target.value)}
+                placeholder="例：古着Tシャツ"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">仕入れ額（円）</label>
+                <input type="text" inputMode="numeric" value={manualBuyPrice}
+                  onChange={(e) => { if (e.target.value===''||/^[0-9]+$/.test(e.target.value)) setManualBuyPrice(e.target.value) }}
+                  placeholder="0"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">売値（円）</label>
+                <input type="text" inputMode="numeric" value={manualSellPrice}
+                  onChange={(e) => { if (e.target.value===''||/^[0-9]+$/.test(e.target.value)) setManualSellPrice(e.target.value) }}
+                  placeholder="未入力OK"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-right"
+                />
+              </div>
+            </div>
+            <button
+              onClick={addManual}
+              disabled={!manualName.trim() || selected.length >= maxBundle}
+              className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              ＋ この商品を追加する
+            </button>
+            {/* 追加済みリスト */}
+            {selected.length > 0 && (
+              <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 space-y-1">
+                <p className="text-xs font-semibold text-gray-500 mb-1">追加済み（{selected.length}件）</p>
+                {selected.map((p, i) => (
+                  <div key={p._bundleKey || p.id} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1 text-gray-700 truncate">{p.name}</span>
+                    {p.isManual && <span className="text-[9px] text-blue-400 shrink-0">手動</span>}
+                    <span className="text-gray-400 shrink-0">¥{Number(p.buyPrice).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="px-4 py-3 border-t border-gray-100">
           <button
             onClick={onClose}
@@ -225,6 +333,15 @@ const BUNDLE_DRAFT_KEY = 'bundle_draft'
 
 // ── メインページ ──────────────────────────────────────────
 export default function BundlePage({ feeRates, onFeeRatesChange }) {
+  const [premium, setPremium] = useState(isPremium)
+  const MAX_BUNDLE = premium ? MAX_BUNDLE_PREMIUM : MAX_BUNDLE_FREE
+
+  useEffect(() => {
+    function onPlanUpdate() { setPremium(isPremium()) }
+    window.addEventListener('plan-updated', onPlanUpdate)
+    return () => window.removeEventListener('plan-updated', onPlanUpdate)
+  }, [])
+
   // 一時保存データを初期値として読み込む
   const loadDraft = () => {
     try {
@@ -636,6 +753,7 @@ export default function BundlePage({ feeRates, onFeeRatesChange }) {
           selected={selected}
           onSelect={setSelected}
           onClose={() => setShowSelect(false)}
+          maxBundle={MAX_BUNDLE}
         />
       )}
 

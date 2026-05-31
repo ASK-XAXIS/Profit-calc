@@ -11,8 +11,8 @@ import SoldModal from './SoldModal'
 import { saveSale, getSoldCountByProductId } from './salesStore'
 import { RAKUMA_FEE_OPTIONS, feeLabel } from './feeConfig.jsx'
 import { getAllHistory, pushHistory, deleteHistory } from './productHistoryStore'
+import { isPremium, getProductLimit, FREE_LIMIT } from './planStore'
 
-const MAX_PRODUCTS  = 100
 const MAX_IMAGES    = 10
 
 const PLATFORM_LABEL = {
@@ -1026,21 +1026,38 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
   const [editingProduct, setEditingProduct]       = useState(null)
   const [simulatingProduct, setSimulatingProduct] = useState(null)
   const [soldProduct, setSoldProduct]             = useState(null)
-  const [detailProduct, setDetailProduct]         = useState(null)  // 詳細表示中の商品
+  const [detailProduct, setDetailProduct]         = useState(null)
   const [search, setSearch]                       = useState('')
+  const [premium, setPremium]                     = useState(isPremium)
+  const [showLimitModal, setShowLimitModal]       = useState(false)
 
   useEffect(() => { setProducts(getAllProducts()) }, [])
 
-  // productStore の変更（BundlePage からの在庫更新など）を即時反映
+  // productStore の変更を即時反映
   useEffect(() => {
     function onUpdate() { setProducts(getAllProducts()) }
     window.addEventListener('products-updated', onUpdate)
     return () => window.removeEventListener('products-updated', onUpdate)
   }, [])
 
+  // プラン変更を即時反映
+  useEffect(() => {
+    function onPlanUpdate() { setPremium(isPremium()) }
+    window.addEventListener('plan-updated', onPlanUpdate)
+    return () => window.removeEventListener('plan-updated', onPlanUpdate)
+  }, [])
+
   function refresh() { setProducts(getAllProducts()) }
 
-  function openAdd()         { setEditingProduct(createEmptyProduct()); setShowModal(true) }
+  function openAdd() {
+    const limit = getProductLimit()
+    if (products.length >= limit) {
+      setShowLimitModal(true)
+      return
+    }
+    setEditingProduct(createEmptyProduct())
+    setShowModal(true)
+  }
   function openEdit(product) { setEditingProduct({ ...product }); setShowModal(true) }
 
   function handleSave(product) {
@@ -1120,9 +1137,11 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-gray-400">{products.length} / {MAX_PRODUCTS}件</p>
-        <button id={addBtnId} onClick={openAdd} disabled={products.length >= MAX_PRODUCTS}
-          className="flex items-center gap-1 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+        <p className="text-xs text-gray-400">{products.length} / {getProductLimit()}件
+          {!premium && <span className="ml-1 text-[10px] text-orange-400">（無料プラン）</span>}
+        </p>
+        <button id={addBtnId} onClick={openAdd}
+          className="flex items-center gap-1 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 shadow-sm transition">
           ＋ 商品追加
         </button>
       </div>
@@ -1176,6 +1195,59 @@ export default function ProductManager({ calcState, onLoadToCalc, addBtnId, view
           onSave={handleSoldSave}
           onClose={() => setSoldProduct(null)}
         />
+      )}
+
+      {/* 5件到達バナー（無料プランのみ） */}
+      {!premium && products.length >= 5 && products.length < FREE_LIMIT && (
+        <div className="fixed bottom-20 left-0 right-0 mx-3 z-30">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl px-4 py-3 flex items-center justify-between shadow-lg">
+            <div>
+              <p className="text-white text-xs font-bold">プレミアムにアップグレード</p>
+              <p className="text-blue-100 text-[10px]">商品を100件まで登録 + 経常利益グラフ</p>
+            </div>
+            <button
+              onClick={() => window.__openUpgradeModal?.('banner')}
+              className="bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0"
+            >
+              詳しく見る
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 15件上限モーダル（無料プラン） */}
+      {showLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-700 px-6 py-8 text-center">
+              <div className="text-4xl mb-2">🚀</div>
+              <h2 className="text-white text-lg font-black">商品登録の上限に達しました</h2>
+              <p className="text-blue-100 text-xs mt-1">無料プランは{FREE_LIMIT}件まで</p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <div className="bg-blue-50 rounded-2xl px-4 py-3 space-y-2">
+                <p className="text-sm font-bold text-gray-700">プレミアムプランでできること</p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>✅ 商品登録 最大100件</li>
+                  <li>✅ 日・月・年の経常利益グラフ</li>
+                  <li>✅ 広告非表示</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => { setShowLimitModal(false); window.__openUpgradeModal?.('limit') }}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-2xl text-sm shadow"
+              >
+                プレミアムにアップグレード
+              </button>
+              <button
+                onClick={() => setShowLimitModal(false)}
+                className="w-full text-gray-400 text-xs py-2"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

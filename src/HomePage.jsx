@@ -92,7 +92,7 @@ function BundleWidgetContent() {
         </div>
         <div className="flex-1 rounded-xl py-1.5 text-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
           <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.7)' }}>最大</p>
-          <p className="font-black text-lg leading-none text-white">5</p>
+          <p className="font-black text-lg leading-none text-white">*5</p>
           <p className="text-[9px]" style={{ color: 'rgba(255,255,255,0.6)' }}>商品</p>
         </div>
       </div>
@@ -102,6 +102,7 @@ function BundleWidgetContent() {
         </div>
       )}
       <p className="text-[10px] leading-snug" style={{ color: 'rgba(255,255,255,0.6)' }}>複数商品をまとめて販売する際の価格計算と損益比較</p>
+      <p className="text-[8px] leading-snug" style ={{ color: 'rgba(255,255,255,0.6)'}}>*有料版購入後の最大数です（無料版は最大2商品）</p>
     </div>
   )
 }
@@ -356,7 +357,7 @@ function SortableGrid({ order, onOrderChange, isEditMode, onNavigate }) {
 }
 
 // ── ホームページメイン ────────────────────────────────────
-export default function HomePage({ onNavigate }) {
+export default function HomePage({ onNavigate, onLegal }) {
   const [order, setOrder]         = useState(loadOrder)
   const [isEditMode, setEditMode] = useState(false)
 
@@ -375,7 +376,10 @@ export default function HomePage({ onNavigate }) {
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-gray-700">フリマ利益計算</h2>
+          <div className="flex items-baseline gap-1.5">
+            <h2 className="text-lg font-black text-blue-500 tracking-tight">Revofit</h2>
+            <span className="text-[10px] text-gray-400 font-normal">レボフィット</span>
+          </div>
           <p className="text-[10px] text-gray-400">
             {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -411,6 +415,30 @@ export default function HomePage({ onNavigate }) {
 
       {!isEditMode && (
         <p className="text-center text-[10px] text-gray-300">各カードをタップしてモードに移動</p>
+      )}
+
+      {/* 法的ページリンク */}
+      {!isEditMode && (
+        <div className="mt-2 border-t border-gray-200 pt-4 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <button
+            onClick={() => onLegal('privacy')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            プライバシーポリシー
+          </button>
+          <button
+            onClick={() => onLegal('terms')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            利用規約
+          </button>
+          <button
+            onClick={() => onLegal('commercial')}
+            className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
+          >
+            特定商取引法に基づく表記
+          </button>
+        </div>
       )}
     </div>
   )

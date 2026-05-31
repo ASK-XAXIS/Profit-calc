@@ -658,6 +658,8 @@ function ExcelExportModal({ sales, onClose }) {
 }
 
 // ── メインページ ──────────────────────────────────────────
+import { isPremium } from './planStore'
+
 export default function SummaryPage({ feeRates, onFeeRatesChange }) {
   const [sales, setSales]           = useState([])
   const [period, setPeriod]         = useState('month')
@@ -665,11 +667,18 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
   const [showDetail, setShowDetail] = useState(false)
   const [editingSale, setEditingSale]     = useState(null)
   const [showNewSale, setShowNewSale]     = useState(false)
-  const [showCsvModal, setShowCsvModal]   = useState(false)   // Excel出力
+  const [showCsvModal, setShowCsvModal]   = useState(false)
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [premium, setPremium]             = useState(isPremium)
+  const [showExcelLock, setShowExcelLock] = useState(false)
 
-  // 初回ロード
   useEffect(() => { setSales(getAllSales()) }, [])
+
+  useEffect(() => {
+    function onPlanUpdate() { setPremium(isPremium()) }
+    window.addEventListener('plan-updated', onPlanUpdate)
+    return () => window.removeEventListener('plan-updated', onPlanUpdate)
+  }, [])
 
   // salesStore から sales-updated イベントを受け取って即時リフレッシュ
   useEffect(() => {
@@ -740,14 +749,25 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
         <div className="ml-auto flex gap-2">
           {/* Excel出力ボタン */}
           <button
-            onClick={() => setShowCsvModal(true)}
-            className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-100 transition"
+            onClick={() => premium ? setShowCsvModal(true) : setShowExcelLock(true)}
+            className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition
+              ${premium
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                : 'border-gray-200 bg-gray-50 text-gray-400'}`}
           >
             <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
               <path fillRule="evenodd" d="M2 13a1 1 0 001 1h10a1 1 0 000-2H3a1 1 0 00-1 1zm3-5.707a1 1 0 011.414 0L7 8.586V3a1 1 0 112 0v5.586l.586-.586a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-            Excel
+            Excel{!premium && <span className="ml-0.5">🔒</span>}
           </button>
+          {!premium && (
+            <button
+              onClick={() => window.__openUpgradeModal?.('manual')}
+              className="flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 transition"
+            >
+              👑 プレミアム
+            </button>
+          )}
           <button onClick={() => setShowNewSale(true)}
             className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition">
             ＋ 売上登録
@@ -950,6 +970,42 @@ export default function SummaryPage({ feeRates, onFeeRatesChange }) {
           sales={sales}
           onClose={() => setShowCsvModal(false)}
         />
+      )}
+
+      {/* Excel出力ロックモーダル（無料プラン） */}
+      {showExcelLock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 px-6 py-8 text-center">
+              <div className="text-4xl mb-2">📊</div>
+              <h2 className="text-white text-lg font-black">Excel出力はプレミアム限定</h2>
+              <p className="text-emerald-100 text-xs mt-1">確定申告・簿記向けフォーマットで出力</p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <div className="bg-emerald-50 rounded-2xl px-4 py-3 space-y-2">
+                <p className="text-sm font-bold text-gray-700">プレミアムプランでできること</p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>✅ Excel出力（.xlsx形式）</li>
+                  <li>✅ 商品登録 最大100件</li>
+                  <li>✅ まとめ売り 最大5件同時計算</li>
+                  <li>✅ 計算機の1日10回制限を解除</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => { setShowExcelLock(false); window.__openUpgradeModal?.('manual') }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 rounded-2xl text-sm shadow"
+              >
+                プレミアムにアップグレード
+              </button>
+              <button
+                onClick={() => setShowExcelLock(false)}
+                className="w-full text-gray-400 text-xs py-2"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
