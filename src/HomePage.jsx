@@ -378,7 +378,7 @@ export default function HomePage({ onNavigate, onLegal }) {
         <div>
           <div className="flex items-baseline gap-1.5">
             <h2 className="text-lg font-black text-blue-500 tracking-tight">Revofit</h2>
-            <span className="text-[10px] text-gray-400 font-normal">レボフィット</span>
+            <span className="text-[10px] text-gray-400 font-normal">レヴォフィット</span>
           </div>
           <p className="text-[10px] text-gray-400">
             {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -420,6 +420,12 @@ export default function HomePage({ onNavigate, onLegal }) {
       {/* 法的ページリンク */}
       {!isEditMode && (
         <div className="mt-2 border-t border-gray-200 pt-4 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <a
+            href="/guide.html"
+            className="text-[10px] text-blue-400 hover:text-blue-600 underline transition font-semibold"
+          >
+            📖 使い方ガイド
+          </a>
           <button
             onClick={() => onLegal('privacy')}
             className="text-[10px] text-gray-400 hover:text-blue-500 underline transition"
