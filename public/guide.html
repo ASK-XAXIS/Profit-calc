@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Revofitの使い方ガイド | フリマ利益計算アプリ</title>
+  <meta name="description" content="Revofit（レボフィット）の使い方を詳しく解説。メルカリ・Yahoo!フリマ・ラクマ・ヤフオクの利益計算方法、まとめ売り計算、商品管理、損益集計の使い方をわかりやすく説明します。" />
+  <meta name="keywords" content="Revofit,使い方,フリマ,利益計算,メルカリ,ラクマ,ヤフオク,Yahoo!フリマ,転売,せどり,まとめ売り" />
+  <meta name="author" content="Revofit" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="canonical" href="https://revofit.jp/guide.html" />
+
+  <!-- OGP -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://revofit.jp/guide.html" />
+  <meta property="og:title" content="Revofitの使い方ガイド | フリマ利益計算アプリ" />
+  <meta property="og:description" content="Revofit（レボフィット）の使い方を詳しく解説。4つのフリマプラットフォームの利益を同時計算する方法を説明します。" />
+  <meta property="og:image" content="https://revofit.jp/ogp.png" />
+  <meta property="og:site_name" content="Revofit" />
+  <meta property="og:locale" content="ja_JP" />
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BVP6P2HJMZ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BVP6P2HJMZ');
+  </script>
+
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9473385884823712" crossorigin="anonymous"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.8;
+    }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ヘッダー */
+    header {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .header-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo { font-size: 20px; font-weight: 800; color: #3b82f6; }
+    .logo span { font-size: 12px; font-weight: 400; color: #94a3b8; margin-left: 6px; }
+    .header-btn {
+      background: #3b82f6;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* メインコンテンツ */
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 32px 16px 80px;
+    }
+
+    /* ヒーローセクション */
+    .hero {
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      color: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .hero p { font-size: 14px; opacity: 0.9; }
+    .hero .cta {
+      display: inline-block;
+      margin-top: 20px;
+      background: white;
+      color: #2563eb;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* 目次 */
+    .toc {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    .toc h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #475569; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin-bottom: 6px; font-size: 14px; }
+
+    /* セクション */
+    section {
+      background: white;
+      border-radius: 12px;
+      padding: 28px 24px;
+      margin-bottom: 24px;
+      border: 1px solid #e2e8f0;
+    }
+    section h2 {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #eff6ff;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    section h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 20px 0 8px;
+      color: #334155;
+    }
+    section p {
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 12px;
+    }
+    section ul, section ol {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
+    section li {
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    /* ステップボックス */
+    .step-box {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .step-box p { margin: 0; color: #1e40af; font-size: 14px; }
+
+    /* ヒントボックス */
+    .tip-box {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .tip-box p { margin: 0; color: #166534; font-size: 13px; }
+
+    /* 注意ボックス */
+    .warn-box {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .warn-box p { margin: 0; color: #92400e; font-size: 13px; }
+
+    /* プラットフォームバッジ */
+    .platform-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+    .badge.mercari { background: #ef4444; }
+    .badge.yahoo   { background: #7c3aed; }
+    .badge.rakuma  { background: #1e40af; }
+    .badge.yahuoku { background: #f97316; }
+
+    /* FAQ */
+    .faq-item {
+      border-bottom: 1px solid #f1f5f9;
+      padding: 16px 0;
+    }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-q { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+    .faq-q::before { content: 'Q. '; color: #3b82f6; }
+    .faq-a { font-size: 14px; color: #475569; padding-left: 20px; }
+    .faq-a::before { content: 'A. '; color: #10b981; font-weight: 700; margin-left: -20px; }
+
+    /* コラム */
+    .column {
+      background: linear-gradient(135deg, #f8fafc, #eff6ff);
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .column h2 {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #1e40af;
+    }
+    .column p { font-size: 14px; color: #475569; margin-bottom: 10px; }
+
+    /* フッター */
+    footer {
+      background: #1e293b;
+      color: #94a3b8;
+      text-align: center;
+      padding: 32px 16px;
+      font-size: 13px;
+    }
+    footer a { color: #60a5fa; margin: 0 8px; }
+    .footer-logo { font-size: 20px; font-weight: 800; color: white; margin-bottom: 12px; }
+
+    /* レスポンシブ */
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 20px; }
+      section { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header>
+  <div class="header-inner">
+    <div class="logo">Revofit<span>レボフィット</span></div>
+    <a class="header-btn" href="/">アプリを使う →</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ヒーロー -->
+  <div class="hero">
+    <h1>📖 Revofit 使い方ガイド</h1>
+    <p>フリマの利益計算をもっとかんたんに。<br>全機能の使い方をわかりやすく解説します。</p>
+    <a class="cta" href="/">今すぐ無料で使う →</a>
+  </div>
+
+  <!-- AdSense広告枠 -->
+  <ins class="adsbygoogle"
+    style="display:block;margin-bottom:32px;"
+    data-ad-client="ca-pub-9473385884823712"
+    data-ad-slot="6515851195"
+    data-ad-format="auto"
+    data-full-width-responsive="true"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+  <!-- 目次 -->
+  <div class="toc">
+    <h2>📋 目次</h2>
+    <ol>
+      <li><a href="#about">Revofitとは？</a></li>
+      <li><a href="#calc">利益計算機の使い方</a></li>
+      <li><a href="#products">商品管理の使い方</a></li>
+      <li><a href="#bundle">まとめ売り計算の使い方</a></li>
+      <li><a href="#summary">損益集計の使い方</a></li>
+      <li><a href="#column">フリマで稼ぐための利益計算のコツ</a></li>
+      <li><a href="#faq">よくある質問（FAQ）</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. Revofitとは -->
+  <section id="about">
+    <h2>🎯 Revofitとは？</h2>
+    <p>
+      Revofit（レボフィット）は、フリマアプリでの売買における利益計算を効率化するための無料Webアプリです。
+      メルカリ・Yahoo!フリマ・ラクマ・ヤフオクの4つのプラットフォームに対応しており、
+      送料・手数料・仕入れ額を入力するだけで正確な利益を瞬時に算出できます。
+    </p>
+
+    <div class="platform-badges">
+      <span class="badge mercari">メルカリ</span>
+      <span class="badge yahoo">Yahoo!フリマ</span>
+      <span class="badge rakuma">ラクマ</span>
+      <span class="badge yahuoku">ヤフオク</span>
+    </div>
+
+    <h3>主な機能</h3>
+    <ul>
+      <li>📊 <strong>利益計算機</strong>：4プラットフォームの利益を同時計算</li>
+      <li>📦 <strong>商品管理</strong>：仕入れた商品の在庫・利益を一元管理</li>
+      <li>🛒 <strong>まとめ売り計算</strong>：複数商品のまとめ売り利益を比較</li>
+      <li>📈 <strong>損益集計</strong>：日・月・年別の売上・利益をグラフで確認</li>
+    </ul>
+
+    <div class="tip-box">
+      <p>✅ ブラウザで動作するWebアプリなので、インストール不要。スマホ・PC・タブレットから利用できます。</p>
+    </div>
+  </section>
+
+  <!-- 2. 利益計算機 -->
+  <section id="calc">
+    <h2>🧮 利益計算機の使い方</h2>
+    <p>
+      利益計算機は、販売額または仕入れ額を入力するだけで、
+      4つのフリマプラットフォームの利益を一括計算できる機能です。
+    </p>
+
+    <h3>基本の使い方</h3>
+    <div class="step-box"><p>① 「販売額（円）」に売りたい金額を入力します</p></div>
+    <div class="step-box"><p>② 「仕入額（円）」に購入した金額を入力します</p></div>
+    <div class="step-box"><p>③「計算する」ボタンを押すと4プラットフォームの利益が一覧表示されます</p></div>
+    <div class="step-box"><p>④ 各プラットフォームで発送方法・梱包材費を個別に設定できます</p></div>
+
+    <h3>販売額を入力しない場合</h3>
+    <p>
+      仕入れ額だけを入力して「計算する」を押すと、損益ゼロになる<strong>最低販売価格</strong>が表示されます。
+      「この商品はいくら以上で売れば利益が出るか」を知りたいときに便利です。
+    </p>
+
+    <h3>仕入額を入力しない場合</h3>
+    <p>
+      販売額だけを入力すると、損益ゼロになる<strong>最高仕入額</strong>が表示されます。
+      「この値段で売るなら、いくらまでなら仕入れてよいか」を知りたいときに使います。
+    </p>
+
+    <div class="tip-box">
+      <p>💡 梱包材費を全プラットフォームに一括適用したい場合は「📦 梱包材費を一括入力」ボタンを使うと便利です。</p>
+    </div>
+
+    <div class="warn-box">
+      <p>⚠️ 無料プランでは1日10回まで計算できます。制限なく使いたい場合はプレミアムプランへのアップグレードをご検討ください。</p>
+    </div>
+  </section>
+
+  <!-- 3. 商品管理 -->
+  <section id="products">
+    <h2>📦 商品管理の使い方</h2>
+    <p>
+      仕入れた商品の情報を登録・管理する機能です。
+      商品ごとに仕入れ額・売値・在庫数・発送方法などを記録できます。
+    </p>
+
+    <h3>商品の登録方法</h3>
+    <div class="step-box"><p>① 「＋ 商品追加」ボタンをタップ</p></div>
+    <div class="step-box"><p>② 商品名・仕入れ額・売値・在庫数などを入力</p></div>
+    <div class="step-box"><p>③ 発送方法を選択すると送料が自動入力されます</p></div>
+    <div class="step-box"><p>④「保存」ボタンで登録完了</p></div>
+
+    <h3>売れた！ボタンの使い方</h3>
+    <p>
+      商品が売れたら「🎉 売れた！」ボタンをタップします。
+      プラットフォーム・売値・手数料などを確認して登録すると、
+      在庫が自動で減り、損益集計にも反映されます。
+    </p>
+
+    <h3>表示モードの切り替え</h3>
+    <p>画面右上のボタンでリスト表示・グリッド表示・詳細表示の3種類に切り替えられます。</p>
+
+    <div class="tip-box">
+      <p>💡 無料プランでは最大15件まで登録できます。プレミアムプランでは最大100件まで登録可能です。</p>
+    </div>
+  </section>
+
+  <!-- 4. まとめ売り -->
+  <section id="bundle">
+    <h2>🛒 まとめ売り計算の使い方</h2>
+    <p>
+      複数の商品をまとめて販売する際の利益を計算し、
+      個別販売との利益差を比較できる機能です。
+      フリマでよくある「まとめ割り」交渉にも活用できます。
+    </p>
+
+    <h3>基本の使い方</h3>
+    <div class="step-box"><p>① 「＋ 変更」ボタンから商品を選択（最大5商品）</p></div>
+    <div class="step-box"><p>② 同じ商品は在庫数分まで複数選択できます</p></div>
+    <div class="step-box"><p>③ プラットフォーム・発送方法・梱包材費を設定</p></div>
+    <div class="step-box"><p>④ まとめ売り価格が自動計算され、個別販売との差額が表示されます</p></div>
+
+    <h3>手動入力機能</h3>
+    <p>
+      商品管理に登録していない商品も、「手動入力」タブから商品名・仕入れ額・売値を入力して追加できます。
+    </p>
+
+    <h3>利益比較の見方</h3>
+    <p>
+      「個別販売した場合との比較」欄に、個別販売の合計利益とまとめ売りの利益の差額が表示されます。
+      まとめ売りは送料が1回分で済むため、多くの場合で個別販売より利益が高くなります。
+    </p>
+
+    <div class="tip-box">
+      <p>💡 客から値下げ交渉があったときは「客の希望金額」欄に入力すると、その価格でのまとめ売り利益を確認できます。</p>
+    </div>
+  </section>
+
+  <!-- 5. 損益集計 -->
+  <section id="summary">
+    <h2>📈 損益集計の使い方</h2>
+    <p>
+      これまでの売上・利益・手数料・送料などを集計して確認できる機能です。
+      日別・月別・年別で表示でき、グラフでも確認できます。
+    </p>
+
+    <h3>売上の確認方法</h3>
+    <div class="step-box"><p>① 画面上部の「日別」「月別」「年別」で集計期間を切り替え</p></div>
+    <div class="step-box"><p>② 「数字」「グラフ」タブで表示形式を切り替え</p></div>
+    <div class="step-box"><p>③ 各期間をタップすると詳細な内訳が表示されます</p></div>
+
+    <h3>売上の手動登録</h3>
+    <p>
+      「＋ 売上登録」ボタンから手動で売上を追加することもできます。
+      商品名・売上額・仕入れ値・手数料・送料・梱包材費を入力すると利益が自動計算されます。
+    </p>
+
+    <h3>Excel出力（プレミアム限定）</h3>
+    <p>
+      プレミアムプランでは、月次の売上データをExcel（.xlsx）形式でダウンロードできます。
+      確定申告や帳簿管理に便利なフォーマットで出力されます。
+    </p>
+
+    <div class="tip-box">
+      <p>💡 プラットフォーム別の販売ランキングも確認できます。どのフリマアプリが一番売れているか一目でわかります。</p>
+    </div>
+  </section>
+
+  <!-- AdSense広告枠 -->
+  <ins class="adsbygoogle"
+    style="display:block;margin-bottom:32px;"
+    data-ad-client="ca-pub-9473385884823712"
+    data-ad-slot="6515851195"
+    data-ad-format="auto"
+    data-full-width-responsive="true"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+
+  <!-- 6. コラム -->
+  <div class="column" id="column">
+    <h2>💡 フリマで稼ぐための利益計算のコツ</h2>
+
+    <h3 style="font-size:15px;font-weight:700;color:#334155;margin:16px 0 8px;">① 手数料を正確に把握する</h3>
+    <p>
+      フリマアプリによって手数料率は異なります。メルカリは10%、Yahoo!フリマは5%、ラクマは6〜10%、ヤフオクは8.8〜10%です。
+      同じ商品でも販売するプラットフォームによって利益が大きく変わるため、事前に比較することが重要です。
+      Revofitの利益計算機を使えば、4プラットフォームの利益を一瞬で比較できます。
+    </p>
+
+    <h3 style="font-size:15px;font-weight:700;color:#334155;margin:16px 0 8px;">② 送料は発送方法で大きく変わる</h3>
+    <p>
+      送料はフリマ転売の利益に直結します。らくらくメルカリ便・ゆうゆうメルカリ便・ネコポスなど、
+      サイズに合った発送方法を選ぶことで送料を最小限に抑えられます。
+      Revofitでは各プラットフォームの発送方法を選択すると送料が自動入力されるので、正確な利益計算が可能です。
+    </p>
+
+    <h3 style="font-size:15px;font-weight:700;color:#334155;margin:16px 0 8px;">③ まとめ売りで利益を最大化する</h3>
+    <p>
+      複数の商品をまとめて販売すると、送料が1回分で済むため利益率が上がります。
+      例えば1商品ずつ売ると送料が3回分かかるところ、まとめ売りなら1回分だけです。
+      Revofitのまとめ売り計算機能で、個別販売との利益差を事前に確認しましょう。
+    </p>
+
+    <h3 style="font-size:15px;font-weight:700;color:#334155;margin:16px 0 8px;">④ 梱包材費も忘れずに計算する</h3>
+    <p>
+      段ボール・プチプチ・テープなどの梱包材費は、見落としがちなコストです。
+      1件あたり数十円でも積み重なると利益を圧迫します。
+      Revofitでは梱包材費も含めた正確な利益計算ができるので、実際の手取り額を把握できます。
+    </p>
+
+    <h3 style="font-size:15px;font-weight:700;color:#334155;margin:16px 0 8px;">⑤ 損益集計で月次の収支を把握する</h3>
+    <p>
+      フリマ転売を継続的に行うなら、月次の収支管理が重要です。
+      売上が多くても、送料・手数料・仕入れ費用を引いた純利益が把握できていないと、
+      実際にどれだけ稼げているかわかりません。
+      Revofitの損益集計機能で、毎月の純利益をしっかり管理しましょう。
+    </p>
+  </div>
+
+  <!-- 7. FAQ -->
+  <section id="faq">
+    <h2>❓ よくある質問（FAQ）</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Revofitは無料で使えますか？</div>
+      <div class="faq-a">はい、基本機能は無料でご利用いただけます。商品登録15件まで・計算機1日10回まで無料です。制限なく使いたい場合は、プレミアムプラン（¥980・買い切り）をご利用ください。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">アプリのインストールは必要ですか？</div>
+      <div class="faq-a">不要です。ブラウザからrevofit.jpにアクセスするだけで利用できます。スマートフォン・PC・タブレットに対応しています。ホーム画面に追加すると、アプリのように使えます。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">登録したデータはどこに保存されますか？</div>
+      <div class="faq-a">データはお使いの端末のブラウザ（ローカルストレージ）に保存されます。ブラウザのキャッシュを削除するとデータが消える場合があります。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">プレミアムプランの購入後、返金はできますか？</div>
+      <div class="faq-a">デジタルコンテンツの性質上、購入完了後の返金は原則として対応しておりません。詳しくは利用規約をご確認ください。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">ラクマの手数料率が違うのですが？</div>
+      <div class="faq-a">ラクマの手数料率はプランによって異なります。利益計算機のラクマカラムにある手数料バッジをタップすると、手数料率を変更できます。</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Android・iOSアプリはありますか？</div>
+      <div class="faq-a">現在Androidアプリを開発中です。リリース時にはX（Twitter）でお知らせします。iOSアプリも準備中です。</div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <div style="text-align:center;padding:32px 0;">
+    <p style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;">さっそくRevofitを使ってみましょう</p>
+    <a href="/" style="display:inline-block;background:#3b82f6;color:white;padding:14px 32px;border-radius:12px;font-weight:700;font-size:16px;">無料で使う →</a>
+    <p style="font-size:12px;color:#94a3b8;margin-top:12px;">登録不要・インストール不要</p>
+  </div>
+
+</main>
+
+<!-- フッター -->
+<footer>
+  <div class="footer-logo">Revofit</div>
+  <div style="margin-bottom:12px;">
+    <a href="/">ホーム</a>
+    <a href="/guide.html">使い方ガイド</a>
+    <a href="/#privacy">プライバシーポリシー</a>
+    <a href="/#terms">利用規約</a>
+    <a href="/#commercial">特定商取引法に基づく表記</a>
+  </div>
+  <p>© 2026 Revofit. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
