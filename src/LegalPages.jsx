@@ -1,6 +1,6 @@
 // LegalPages.jsx — プライバシーポリシー / 利用規約 / 特定商取引法に基づく表記
 
-const UPDATED = '2025年6月1日'
+const UPDATED = '2026年5月26日'
 const APP_NAME = 'Revofit（レボフィット）'
 const OPERATOR = 'RYO MORITOU'
 const ADDRESS  = '沖縄県豊見城市字豊見城1004-1 ウィングシャトー豊見城プロムナード708'
@@ -39,7 +39,7 @@ function LegalLayout({ title, children, onBack }) {
       <div className="bg-gray-50 rounded-2xl px-5 py-4 text-center">
         <p className="text-[10px] text-gray-400">運営者：{OPERATOR}</p>
         <p className="text-[10px] text-gray-400">お問い合わせ：{EMAIL}</p>
-        <p className="text-[11px] text-gray-300 mt-2">© 2025 {OPERATOR}. All rights reserved.</p>
+        <p className="text-[11px] text-gray-300 mt-2">© 2026 {OPERATOR}. All rights reserved.</p>
       </div>
     </div>
   )
@@ -106,6 +106,10 @@ export function PrivacyPolicy({ onBack }) {
       <Section title="4. 第三者提供">
         <p>
           運営者は、法令に基づく場合を除き、ユーザーの個人情報を第三者に提供・開示・売却することはありません。
+        </p>
+        <p className="mt-2">
+          なお、Web版でのプレミアムプラン購入時には、決済処理のためStripe, Inc.に必要な情報を提供します。
+          Stripeのプライバシーポリシーは <span className="text-blue-500 underline">https://stripe.com/jp/privacy</span> をご確認ください。
         </p>
       </Section>
 
@@ -224,11 +228,28 @@ export function TermsOfService({ onBack }) {
       <Section title="第7条（プレミアムプランについて）">
         <p>
           本アプリは無料プランと有料プレミアムプランを提供しています。
-          プレミアムプランの購入・解約・払い戻しについては、各ストア（App Store / Google Play）
-          のポリシーに従います。
         </p>
         <p className="mt-2">
+          プレミアムプランの購入方法はご利用環境により異なります。
+        </p>
+        <ul className="list-disc pl-4 space-y-1 mt-1">
+          <li>
+            <span className="font-semibold">Webブラウザ版（revofit.jp）：</span>
+            Stripe, Inc. が提供する決済システムを使用します。クレジットカードによるお支払いとなります。
+            購入・返金ポリシーは本規約に従います。
+          </li>
+          <li>
+            <span className="font-semibold">Android版（Google Play）：</span>
+            Google Play の決済システムに準じます。
+          </li>
+          <li>
+            <span className="font-semibold">iOS版（App Store）：</span>
+            App Store の決済システムに準じます。
+          </li>
+        </ul>
+        <p className="mt-2">
           デジタルコンテンツの性質上、購入完了後の返金は原則として対応しておりません。
+          ただし法令に基づく場合はこの限りではありません。
         </p>
       </Section>
 
@@ -271,7 +292,7 @@ export function CommercialDisclosure({ onBack }) {
     { label: '電話番号',         value: 'メールにてお問い合わせください（お問い合わせ後、必要に応じてご連絡します）' },
     { label: 'サービス名',       value: APP_NAME },
     { label: '販売価格',         value: 'アプリ内の各プランページに表示する価格（税込）' },
-    { label: '支払方法',         value: 'App Store / Google Play の決済システムに準じます（クレジットカード等）' },
+    { label: '支払方法',         value: '【Webブラウザ版】クレジットカード（Stripe）／【Android版】Google Play の決済システム／【iOS版】App Store の決済システム' },
     { label: '支払時期',         value: '購入手続き完了時にお支払いとなります' },
     { label: 'サービス提供時期', value: '購入完了後、即時ご利用いただけます' },
     { label: '返品・キャンセル', value: 'デジタルコンテンツの性質上、購入完了後の返金・キャンセルは原則として対応しておりません。ただし法令に基づく場合はこの限りではありません。' },
